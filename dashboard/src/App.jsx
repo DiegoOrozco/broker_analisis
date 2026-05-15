@@ -11,8 +11,8 @@ function App() {
   const [useGemini, setUseGemini] = useState(true)
   
   const ws = useRef(null)
-  const API_BASE = "https://desktop-d4f7e4e.tail4dc00c.ts.net"
-  const WS_BASE = "wss://desktop-d4f7e4e.tail4dc00c.ts.net"
+  const API_BASE = "http://100.75.221.54:8000"
+  const WS_BASE = "ws://100.75.221.54:8000"
 
   useEffect(() => {
     // Fetch initial config
