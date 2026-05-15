@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+websockets
+pandas
+google-generativeai
+python-dotenv
+numpy
+# MetaTrader5  # Nota: Solo Windows. Requiere terminal MT5 activa en el mismo SO.

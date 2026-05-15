@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Environment variables
+.env
+
+# Large files (optional, but good practice if not needed in repo)
+# Anatomi??a i??ndices sinte??ticos Bridge Markets - Junio 2025_unlocked.pdf
