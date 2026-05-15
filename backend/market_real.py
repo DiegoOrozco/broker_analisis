@@ -23,20 +23,23 @@ class BridgeMarketData:
         self.tick_counts = {} # Track ticks per symbol for Gann angles
         
     def connect(self):
-        # Intentar conexión al terminal abierto
-        # A veces initialize devuelve False con error de auth, pero login() funciona después
-        mt5.initialize() 
+        # Usar la ruta absoluta que ya verificamos que funciona para encontrar el terminal
+        path = r"C:\Program Files\BridgeMarkets MetaTrader 5\terminal64.exe"
         
-        # Login con el servidor correcto
+        # Inicializamos con la ruta
+        init_ok = mt5.initialize(path=path)
+        log_debug(f"Initialize status: {init_ok}, error: {mt5.last_error()}")
+        
+        # Intentamos login de todas formas, a veces init falla pero login funciona
         authorized = mt5.login(self.login, password=self.password, server="BridgeMarkets-MT5")
+        
         if authorized:
             log_debug(f"--- CONECTADO A BRIDGE MARKETS MT5 (Acc: {self.login}) ---")
             self.connected = True
             return True
         else:
             log_debug(f"--- FALLO LOGIN MT5 (Acc: {self.login}, Serv: BridgeMarkets-MT5) ---")
-            log_debug(f"Error code = {mt5.last_error()}")
-            # Si falla el login, cerramos para no dejar basura
+            log_debug(f"Error code login = {mt5.last_error()}")
             mt5.shutdown()
             return False
 
