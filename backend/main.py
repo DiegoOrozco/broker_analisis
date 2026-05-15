@@ -78,7 +78,10 @@ async def market_stream(websocket: WebSocket):
         while True:
             tick = market_provider.get_next_tick(symbol)
             if not tick:
-                print(f"--- AVISO: No se reciben ticks de MT5 para {symbol} ---")
+                await websocket.send_json({
+                    "type": "ERROR",
+                    "message": "MT5 no devuelve datos. Revisa si el símbolo existe y el terminal está conectado."
+                })
                 await asyncio.sleep(1)
                 continue
             
