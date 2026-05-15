@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
+import re
 from market_real import BridgeMarketData
 from brain import TradingBrain
 
@@ -16,10 +17,6 @@ app.add_middleware(
 
 market_provider = BridgeMarketData()
 brain = TradingBrain()
-
-@app.get("/")
-async def root():
-    return {"message": "Bridge Markets Trading Laboratory API Active (REAL MARKET)"}
 
 # Global state for configuration
 CONFIG = {
@@ -36,34 +33,31 @@ async def update_config(new_config: dict):
     print(f"--- CONFIGURACIÓN ACTUALIZADA: {CONFIG} ---")
     return CONFIG
 
-# Global state for signals to avoid blocking
+# Global state for signals
 last_signals = {}
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
-    symbol = websocket.query_params.get("symbol", "Fortune100")
+    symbol = websocket.query_params.get("symbol", "Fortune 100.")
+    print(f"--- NUEVO INTENTO DE CONEXIÓN WS: {symbol} ---")
     await websocket.accept()
+    print(f"--- CONEXIÓN WS ACEPTADA PARA {symbol} ---")
     
     async def run_ai_analysis(tick_data):
-        # Background task for AI
         ai_res = None
-        
         if CONFIG["use_gemini"]:
             try:
                 res = await brain.analyze_ticks(symbol, tick_data)
                 if isinstance(res, str):
-                    import re
-                    res = re.sub(r'```json\n|\n```', '', res)
-                    ai_res = json.loads(res)
+                    clean_res = re.sub(r'```json\n|\n```', '', res)
+                    ai_res = json.loads(clean_res)
                 else:
                     ai_res = res
             except Exception as e:
                 print(f"Error calling Gemini: {e}")
                 ai_res = None
-        else:
-            print(f"--- GEMINI IA DESACTIVADA (Ahorro de API) ---")
-            
-        # Fallback logic inside the background task (runs if AI is disabled or fails)
+        
+        # Fallback logic
         if not ai_res or ai_res.get("decision") == "WAIT":
             is_buy = tick_data["angle"] < 180
             ai_res = {
@@ -74,7 +68,7 @@ async def market_stream(websocket: WebSocket):
                 "entry_price": tick_data["price"],
                 "stop_loss": round(tick_data["price"] - 12.4, 2) if is_buy else round(tick_data["price"] + 12.4, 2),
                 "take_profit": round(tick_data["price"] + 30.2, 2) if is_buy else round(tick_data["price"] - 30.2, 2),
-                "confidence_score": 0.85 if not ai_res else ai_res.get("confidence_score", 0.7)
+                "confidence_score": 0.85
             }
         
         last_signals[symbol] = ai_res
@@ -84,14 +78,11 @@ async def market_stream(websocket: WebSocket):
         while True:
             tick = market_provider.get_next_tick(symbol)
             if not tick:
+                print(f"--- AVISO: No se reciben ticks de MT5 para {symbol} ---")
                 await asyncio.sleep(1)
                 continue
             
-            # Trigger analysis at start (tick 1) and then every 50 ticks
             if tick["tick"] == 1 or tick["tick"] % 50 == 0:
-                print(f"--- Iniciando análisis KLRR para {symbol} ---")
-                
-                # Immediate "Thinking" state if no signal yet
                 if symbol not in last_signals:
                     last_signals[symbol] = {
                         "decision": "ANALIZANDO",
@@ -100,7 +91,6 @@ async def market_stream(websocket: WebSocket):
                         "entry_price": tick["price"],
                         "stop_loss": 0, "take_profit": 0, "confidence_score": 0.5
                     }
-                
                 asyncio.create_task(run_ai_analysis(tick))
 
             payload = {
@@ -108,12 +98,11 @@ async def market_stream(websocket: WebSocket):
                 "data": tick,
                 "ai_signal": last_signals.get(symbol)
             }
-            
             await websocket.send_json(payload)
+            # print(f"--- TICK ENVIADO: {tick['price']} ---")
             await asyncio.sleep(0.1)
     except Exception as e:
-        if "close message has been sent" not in str(e):
-            print(f"WS Error for {symbol}: {e}")
+        print(f"--- WS ERROR ({symbol}): {e} ---")
 
 if __name__ == "__main__":
     import uvicorn
