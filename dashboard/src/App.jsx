@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [selectedSymbol, setSelectedSymbol] = useState('FortuneX')
+  const [selectedSymbol, setSelectedSymbol] = useState('Fortune 100.')
   const [ticks, setTicks] = useState([])
   const [currentTick, setCurrentTick] = useState(null)
   const [logs, setLogs] = useState([])
