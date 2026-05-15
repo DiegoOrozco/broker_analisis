@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
-from simulator import SyntheticIndexSimulator
+from market_real import BridgeMarketData
 from brain import TradingBrain
 
 app = FastAPI()
@@ -14,12 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-simulator = SyntheticIndexSimulator(symbol="FortuneX")
+market_provider = BridgeMarketData()
 brain = TradingBrain()
 
 @app.get("/")
 async def root():
-    return {"message": "Bridge Markets Trading Laboratory API Active"}
+    return {"message": "Bridge Markets Trading Laboratory API Active (REAL MARKET)"}
 
 # Global state for configuration
 CONFIG = {
@@ -41,9 +41,8 @@ last_signals = {}
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
-    symbol = websocket.query_params.get("symbol", "FortuneX")
+    symbol = websocket.query_params.get("symbol", "Fortune100")
     await websocket.accept()
-    local_sim = SyntheticIndexSimulator(symbol=symbol)
     
     async def run_ai_analysis(tick_data):
         # Background task for AI
@@ -83,7 +82,10 @@ async def market_stream(websocket: WebSocket):
 
     try:
         while True:
-            tick = local_sim.get_next_tick()
+            tick = market_provider.get_next_tick(symbol)
+            if not tick:
+                await asyncio.sleep(1)
+                continue
             
             # Trigger analysis at start (tick 1) and then every 50 ticks
             if tick["tick"] == 1 or tick["tick"] % 50 == 0:
