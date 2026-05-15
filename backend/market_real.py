@@ -12,75 +12,64 @@ def log_debug(msg):
 load_dotenv()
 
 class BridgeMarketData:
-    """
-    Connects to Bridge Markets MetaTrader 5 and provides real-time tick data.
-    """
     def __init__(self):
-        self.login = int(os.getenv("MT5_LOGIN", 0))
-        self.password = os.getenv("MT5_PASSWORD", "")
-        self.server = os.getenv("MT5_SERVER", "BridgeMarkets-Server")
+        self.login = int(os.getenv("MT5_LOGIN", 238555))
+        self.password = os.getenv("MT5_PASSWORD", "jF6D7ie#E")
+        self.server = os.getenv("MT5_SERVER", "BridgeMarkets-MT5")
         self.connected = False
-        self.tick_counts = {} # Track ticks per symbol for Gann angles
+        self.tick_counts = {}
+        # Intentar conectar al inicializar la clase
+        self.connect()
         
     def connect(self):
-        # Usar la ruta absoluta que ya verificamos que funciona para encontrar el terminal
-        path = r"C:\Program Files\BridgeMarkets MetaTrader 5\terminal64.exe"
-        
-        # Inicializamos con la ruta
-        init_ok = mt5.initialize(path=path)
-        log_debug(f"Initialize status: {init_ok}, error: {mt5.last_error()}")
-        
-        # Intentamos login de todas formas, a veces init falla pero login funciona
-        authorized = mt5.login(self.login, password=self.password, server="BridgeMarkets-MT5")
-        
-        if authorized:
-            log_debug(f"--- CONECTADO A BRIDGE MARKETS MT5 (Acc: {self.login}) ---")
-            self.connected = True
+        if self.connected:
             return True
-        else:
-            log_debug(f"--- FALLO LOGIN MT5 (Acc: {self.login}, Serv: BridgeMarkets-MT5) ---")
-            log_debug(f"Error code login = {mt5.last_error()}")
-            mt5.shutdown()
+            
+        path = r"C:\Program Files\BridgeMarkets MetaTrader 5\terminal64.exe"
+        log_debug(f"--- INTENTANDO CONEXIÓN INICIAL A MT5 (Acc: {self.login}) ---")
+        
+        # Inicialización con login directo
+        if not mt5.initialize(path=path, login=self.login, password=self.password, server="BridgeMarkets-MT5"):
+            log_debug(f"--- FALLO CRITICO INICIALIZACION: {mt5.last_error()} ---")
+            self.connected = False
             return False
+        
+        log_debug("--- CONEXIÓN EXITOSA AL NÚCLEO MT5 ---")
+        self.connected = True
+        return True
 
     def get_next_tick(self, symbol):
         if not self.connected:
             if not self.connect():
-                print("--- ERROR: No se pudo conectar a MT5 ---")
                 return None
         
         try:
-            # Ensure symbol is visible
-            selected = mt5.symbol_select(symbol, True)
-            if not selected:
-                log_debug(f"--- ERROR: Símbolo '{symbol}' no encontrado. ---")
-                return None
-                
+            # Asegurar que el símbolo esté en MarketWatch
+            mt5.symbol_select(symbol, True)
             tick = mt5.symbol_info_tick(symbol)
+            
             if tick is None:
-                log_debug(f"--- ERROR: MT5 devolvió tick None para {symbol} ---")
+                # Si no hay tick, probamos reconectar por si acaso
+                error = mt5.last_error()
+                if error[0] == -10004: # No IPC
+                    self.connected = False
                 return None
                 
-            log_debug(f"--- TICK RECIBIDO DE MT5: {tick.last} ---")
+            log_debug(f"TICK {symbol}: {tick.last}")
             
-            # Gann logic
             if symbol not in self.tick_counts:
                 self.tick_counts[symbol] = 0
             self.tick_counts[symbol] += 1
             
-            gann_angle = self.tick_counts[symbol] % 360
-            spread = tick.ask - tick.bid
-            e_draw = min(0.99, max(0.05, (spread * 100) / tick.bid if tick.bid > 0 else 0.5))
-            
             return {
                 "tick": self.tick_counts[symbol],
-                "angle": gann_angle,
+                "angle": self.tick_counts[symbol] % 360,
                 "price": round(tick.last if tick.last > 0 else tick.bid, 2),
                 "time": tick.time,
-                "e_draw": round(e_draw, 4)
+                "e_draw": round(min(0.99, max(0.05, ((tick.ask - tick.bid) * 100) / tick.bid if tick.bid > 0 else 0.5)), 4)
             }
         except Exception as e:
-            print(f"--- EXCEPCIÓN EN get_next_tick: {e} ---")
+            log_debug(f"Error en tick {symbol}: {e}")
             return None
 
     def close(self):
