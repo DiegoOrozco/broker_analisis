@@ -153,7 +153,7 @@ function App() {
 
       <div className="card" style={{display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center'}}>
         <span style={{color: 'var(--text-dim)'}}>Símbolos sugeridos:</span>
-        {['FortuneX', 'Vortex', 'BullX1000', 'BearX1000', 'FomoX'].map(s => (
+        {['Fortune 100', 'Volatility 75 Index', 'Volatility 100 Index', 'Boom 500 Index', 'Crash 500 Index'].map(s => (
           <button 
             key={s}
             onClick={() => setSelectedSymbol(s)}
