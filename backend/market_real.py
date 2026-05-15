@@ -3,6 +3,12 @@ import os
 import time
 from dotenv import load_dotenv
 
+# Logging a archivo para depuración extrema
+def log_debug(msg):
+    with open("debug.log", "a") as f:
+        f.write(f"[{time.ctime()}] {msg}\n")
+    print(msg)
+
 load_dotenv()
 
 class BridgeMarketData:
@@ -19,18 +25,17 @@ class BridgeMarketData:
     def connect(self):
         # Intentar conexión simple al terminal abierto
         if not mt5.initialize():
-            print(f"--- FALLO INICIALIZACION MT5: {mt5.last_error()} ---")
+            log_debug(f"--- FALLO INICIALIZACION MT5: {mt5.last_error()} ---")
             return False
         
-        # Login con el servidor correcto
         authorized = mt5.login(self.login, password=self.password, server="BridgeMarkets-MT5")
         if authorized:
-            print(f"--- CONECTADO A BRIDGE MARKETS MT5 (Acc: {self.login}) ---")
+            log_debug(f"--- CONECTADO A BRIDGE MARKETS MT5 (Acc: {self.login}) ---")
             self.connected = True
             return True
         else:
-            print(f"--- FALLO LOGIN MT5 (Acc: {self.login}, Serv: BridgeMarkets-MT5) ---")
-            print(f"Error code = {mt5.last_error()}")
+            log_debug(f"--- FALLO LOGIN MT5 (Acc: {self.login}, Serv: BridgeMarkets-MT5) ---")
+            log_debug(f"Error code = {mt5.last_error()}")
             return False
 
     def get_next_tick(self, symbol):
@@ -43,15 +48,15 @@ class BridgeMarketData:
             # Ensure symbol is visible
             selected = mt5.symbol_select(symbol, True)
             if not selected:
-                print(f"--- ERROR: Símbolo '{symbol}' no encontrado. Verifica si tiene punto final. ---")
+                log_debug(f"--- ERROR: Símbolo '{symbol}' no encontrado. ---")
                 return None
                 
             tick = mt5.symbol_info_tick(symbol)
             if tick is None:
-                print(f"--- ERROR: MT5 devolvió tick None para {symbol} ---")
+                log_debug(f"--- ERROR: MT5 devolvió tick None para {symbol} ---")
                 return None
                 
-            print(f"--- TICK RECIBIDO DE MT5: {tick.last} ---")
+            log_debug(f"--- TICK RECIBIDO DE MT5: {tick.last} ---")
             
             # Gann logic
             if symbol not in self.tick_counts:
