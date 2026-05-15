@@ -39,7 +39,7 @@ function App() {
       // Re-connect when symbol changes
       if (ws.current) ws.current.close()
       
-      ws.current = new WebSocket(`${WS_BASE}/ws/market?symbol=${selectedSymbol}`)
+      ws.current = new WebSocket(`${WS_BASE}/ws/market?symbol=${encodeURIComponent(selectedSymbol)}`)
       
       ws.current.onopen = () => {
         setIsConnected(true)
