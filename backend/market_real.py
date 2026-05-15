@@ -33,38 +33,42 @@ class BridgeMarketData:
     def get_next_tick(self, symbol):
         if not self.connected:
             if not self.connect():
+                print("--- ERROR: No se pudo conectar a MT5 ---")
                 return None
         
-        # Ensure symbol is visible in MarketWatch
-        selected = mt5.symbol_select(symbol, True)
-        if not selected:
-            print(f"Símbolo {symbol} no encontrado en Bridge Markets.")
-            return None
+        try:
+            # Ensure symbol is visible
+            selected = mt5.symbol_select(symbol, True)
+            if not selected:
+                print(f"--- ERROR: Símbolo '{symbol}' no encontrado. Verifica si tiene punto final. ---")
+                return None
+                
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is None:
+                print(f"--- ERROR: MT5 devolvió tick None para {symbol} ---")
+                return None
+                
+            print(f"--- TICK RECIBIDO DE MT5: {tick.last} ---")
             
-        tick = mt5.symbol_info_tick(symbol)
-        if tick is None:
-            return None
+            # Gann logic
+            if symbol not in self.tick_counts:
+                self.tick_counts[symbol] = 0
+            self.tick_counts[symbol] += 1
             
-        # Gann logic based on tick count (cycles of 360)
-        if symbol not in self.tick_counts:
-            self.tick_counts[symbol] = 0
-        self.tick_counts[symbol] += 1
-        
-        gann_angle = self.tick_counts[symbol] % 360
-        
-        # Real-time E-Draw calculation (Volatility based)
-        # Using a simple spread/volatility ratio for demonstration
-        # In a real KLRR analysis, this would be more complex
-        spread = tick.ask - tick.bid
-        e_draw = min(0.99, max(0.05, (spread * 100) / tick.bid if tick.bid > 0 else 0.5))
-        
-        return {
-            "tick": self.tick_counts[symbol],
-            "angle": gann_angle,
-            "price": round(tick.last if tick.last > 0 else tick.bid, 2),
-            "time": tick.time,
-            "e_draw": round(e_draw, 4)
-        }
+            gann_angle = self.tick_counts[symbol] % 360
+            spread = tick.ask - tick.bid
+            e_draw = min(0.99, max(0.05, (spread * 100) / tick.bid if tick.bid > 0 else 0.5))
+            
+            return {
+                "tick": self.tick_counts[symbol],
+                "angle": gann_angle,
+                "price": round(tick.last if tick.last > 0 else tick.bid, 2),
+                "time": tick.time,
+                "e_draw": round(e_draw, 4)
+            }
+        except Exception as e:
+            print(f"--- EXCEPCIÓN EN get_next_tick: {e} ---")
+            return None
 
     def close(self):
         mt5.shutdown()
