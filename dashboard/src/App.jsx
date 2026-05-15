@@ -8,20 +8,44 @@ function App() {
   const [logs, setLogs] = useState([])
   const [isConnected, setIsConnected] = useState(false)
   const [lastSignal, setLastSignal] = useState(null)
+  const [useGemini, setUseGemini] = useState(true)
   
   const ws = useRef(null)
+  const API_BASE = "http://100.75.221.54:8000"
+  const WS_BASE = "ws://100.75.221.54:8000"
+
+  useEffect(() => {
+    // Fetch initial config
+    fetch(`${API_BASE}/config`)
+      .then(res => res.json())
+      .then(data => setUseGemini(data.use_gemini))
+      .catch(err => console.error("Error fetching config:", err))
+  }, [])
+
+  const toggleGemini = () => {
+    const newValue = !useGemini
+    setUseGemini(newValue)
+    fetch(`${API_BASE}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ use_gemini: newValue })
+    }).then(() => {
+      addLog(`IA Gemini ${newValue ? 'ACTIVADA' : 'DESACTIVADA (Modo Ahorro)'}`)
+    })
+  }
 
   useEffect(() => {
     const connect = () => {
       // Re-connect when symbol changes
       if (ws.current) ws.current.close()
       
-      ws.current = new WebSocket(`ws://localhost:8000/ws/market?symbol=${selectedSymbol}`)
+      ws.current = new WebSocket(`${WS_BASE}/ws/market?symbol=${selectedSymbol}`)
       
       ws.current.onopen = () => {
         setIsConnected(true)
-        addLog(`Conectado al núcleo: Analizando ${selectedSymbol}`)
+        addLog(`Conectado al núcleo Windows: Analizando ${selectedSymbol}`)
       }
+// ... (rest of the useEffect logic remains mostly same but I need to make sure I don't break the nesting)
       
       ws.current.onmessage = (event) => {
         const payload = JSON.parse(event.data)
@@ -242,6 +266,39 @@ function App() {
               <h4 style={{fontSize: '0.8rem', marginBottom: '10px'}}>CONEXIÓN</h4>
               <div className={`status-badge ${isConnected ? 'live' : ''}`}>
                 {isConnected ? 'SISTEMA ACTIVO' : 'OFFLINE'}
+              </div>
+           </div>
+
+           <div className="card" style={{padding: '15px', marginTop: '15px'}}>
+              <h4 style={{fontSize: '0.8rem', marginBottom: '10px'}}>IA GEMINI</h4>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <span style={{fontSize: '0.7rem', color: useGemini ? 'var(--success)' : 'var(--text-dim)'}}>
+                  {useGemini ? 'ACTIVA' : 'MODO AHORRO'}
+                </span>
+                <button 
+                  onClick={toggleGemini}
+                  style={{
+                    width: '40px',
+                    height: '20px',
+                    borderRadius: '10px',
+                    background: useGemini ? 'var(--accent-primary)' : 'var(--border)',
+                    border: 'none',
+                    position: 'relative',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    position: 'absolute',
+                    top: '2px',
+                    left: useGemini ? '22px' : '2px',
+                    transition: 'all 0.3s'
+                  }} />
+                </button>
               </div>
            </div>
         </div>

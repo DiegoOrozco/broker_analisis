@@ -21,6 +21,21 @@ brain = TradingBrain()
 async def root():
     return {"message": "Bridge Markets Trading Laboratory API Active"}
 
+# Global state for configuration
+CONFIG = {
+    "use_gemini": True
+}
+
+@app.get("/config")
+async def get_config():
+    return CONFIG
+
+@app.post("/config")
+async def update_config(new_config: dict):
+    CONFIG.update(new_config)
+    print(f"--- CONFIGURACIÓN ACTUALIZADA: {CONFIG} ---")
+    return CONFIG
+
 # Global state for signals to avoid blocking
 last_signals = {}
 
@@ -32,30 +47,35 @@ async def market_stream(websocket: WebSocket):
     
     async def run_ai_analysis(tick_data):
         # Background task for AI
-        try:
-            res = await brain.analyze_ticks(symbol, tick_data)
-            ai_res = None
-            if isinstance(res, str):
-                import re
-                res = re.sub(r'```json\n|\n```', '', res)
-                ai_res = json.loads(res)
-            else:
-                ai_res = res
-        except:
-            ai_res = None
+        ai_res = None
+        
+        if CONFIG["use_gemini"]:
+            try:
+                res = await brain.analyze_ticks(symbol, tick_data)
+                if isinstance(res, str):
+                    import re
+                    res = re.sub(r'```json\n|\n```', '', res)
+                    ai_res = json.loads(res)
+                else:
+                    ai_res = res
+            except Exception as e:
+                print(f"Error calling Gemini: {e}")
+                ai_res = None
+        else:
+            print(f"--- GEMINI IA DESACTIVADA (Ahorro de API) ---")
             
-        # Fallback logic inside the background task
+        # Fallback logic inside the background task (runs if AI is disabled or fails)
         if not ai_res or ai_res.get("decision") == "WAIT":
             is_buy = tick_data["angle"] < 180
             ai_res = {
                 "decision": "BUY" if is_buy else "SELL",
                 "type": "Continuidad (Manual)" if tick_data["e_draw"] < 0.45 else "Scalping (Respiro)",
                 "is_continuation": tick_data["e_draw"] < 0.45,
-                "reason": ai_res.get("reason") if ai_res else f"Convergencia de Gann en {tick_data['angle']}°. E-Draw óptimo.",
+                "reason": ai_res.get("reason") if ai_res else f"Algoritmo Matemático: Gann en {tick_data['angle']}°. (IA Apagada)",
                 "entry_price": tick_data["price"],
                 "stop_loss": round(tick_data["price"] - 12.4, 2) if is_buy else round(tick_data["price"] + 12.4, 2),
                 "take_profit": round(tick_data["price"] + 30.2, 2) if is_buy else round(tick_data["price"] - 30.2, 2),
-                "confidence_score": 0.95
+                "confidence_score": 0.85 if not ai_res else ai_res.get("confidence_score", 0.7)
             }
         
         last_signals[symbol] = ai_res
