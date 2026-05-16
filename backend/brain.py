@@ -54,26 +54,31 @@ class TradingBrain:
         }}
         """
         self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3-flash-preview",
             system_instruction=self.system_instruction
         )
 
-    async def analyze_ticks(self, symbol, ticks_history):
+    async def analyze_ticks(self, symbol, ticks_history, prev_signal=None):
         """
         Sends historical market context to Gemini for decision making (Async).
         """
+        prev_decision = prev_signal.get('decision') if prev_signal else 'WAIT'
+        prev_reason = prev_signal.get('reason') if prev_signal else 'Inicio de análisis'
+
         prompt = f"""
         ### DATOS DEL MERCADO ACTUAL (VENTANA HISTÓRICA) ###
         - Índice: {symbol}
         - Total de Ticks en memoria: {len(ticks_history)}
+        - Estado Sugerido Anterior: {prev_decision} ({prev_reason})
         - Historial Cronológico de Ticks (del más antiguo al más reciente):
         {ticks_history}
         
-        ### INSTRUCCIÓN DE ANÁLISIS ESTRUCTURAL ###
-        Con este historial de ticks, no estás viendo un solo punto, sino la TENDENCIA RECIENTE.
-        1. Identifica si hay consolidación, altos más altos o bajos más bajos.
-        2. Revisa el ángulo de Gann del último tick en relación a los anteriores para ver en qué fase de respiración está.
-        3. Evalúa si el comportamiento se alinea con una zona KLRR según el manual.
+        ### INSTRUCCIÓN DE ANÁLISIS ESTRUCTURAL Y FILTRO DE RUIDO ###
+        Con este historial de ticks, no estás viendo un solo punto, sino la TENDENCIA DE FONDO.
+        1. REGLA DE ORO (EVITA EL FLIPEO SCHIZO): En índices sintéticos, cambiar entre BUY y SELL cada 15 segundos arruina la cuenta. Si el estado anterior era BUY/SELL y la estructura de fondo se mantiene (altos más altos, E-Draw controlado), mantén la decisión para dar seguimiento a la operación.
+        2. Identifica si el precio está en un rango de acumulación/distribución de Wyckoff o si hay un rompimiento genuino.
+        3. Revisa el ángulo de Gann del último tick en relación a los anteriores para ver en qué fase de respiración está.
+        4. Si no hay una convergencia clara con una zona KLRR o el mercado está ruidoso, tu decisión OBLIGATORIA es "WAIT" para proteger el capital.
         
         Analiza la convergencia estructural y devuelve la decisión en el formato JSON exigido.
         """

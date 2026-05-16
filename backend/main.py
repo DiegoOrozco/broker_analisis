@@ -53,7 +53,7 @@ async def market_stream(websocket: WebSocket):
         ai_res = None
         if CONFIG["use_gemini"]:
             try:
-                res = await brain.analyze_ticks(symbol, history)
+                res = await brain.analyze_ticks(symbol, history, last_signals.get(symbol))
                 if isinstance(res, str):
                     clean_res = re.sub(r'```json\n|\n```', '', res)
                     ai_res = json.loads(clean_res)
@@ -63,20 +63,18 @@ async def market_stream(websocket: WebSocket):
                 print(f"Error calling Gemini: {e}")
                 ai_res = None
         
-        # Fallback logic en caso de fallo de IA
+        # Fallback o formateo si la decisión es WAIT o falló
         if not ai_res or ai_res.get("decision") == "WAIT":
-            is_buy = history[-1]["angle"] < 180 if history else True
             last_price = history[-1]["price"] if history else 0
-            e_draw = history[-1]["e_draw"] if history else 0
             ai_res = {
-                "decision": "WAIT" if not ai_res else ai_res.get("decision"),
-                "type": ai_res.get("type") if ai_res else "Modo Matemático",
-                "is_continuation": e_draw < 0.45,
-                "reason": ai_res.get("reason") if ai_res else "Sin convergencia KLRR. IA en espera.",
+                "decision": "WAIT",
+                "type": ai_res.get("type") if ai_res else "Espera / Rango",
+                "is_continuation": False,
+                "reason": ai_res.get("reason") if ai_res else "Sin convergencia clara de KLRR / Gann. Esperando setup de alta convicción.",
                 "entry_price": last_price,
-                "stop_loss": round(last_price - 12.4, 2) if is_buy else round(last_price + 12.4, 2),
-                "take_profit": round(last_price + 30.2, 2) if is_buy else round(last_price - 30.2, 2),
-                "confidence_score": 0.85
+                "stop_loss": 0,
+                "take_profit": 0,
+                "confidence_score": ai_res.get("confidence_score", 0.5) if ai_res else 0.5
             }
         
         last_signals[symbol] = ai_res
