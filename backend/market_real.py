@@ -26,15 +26,17 @@ class BridgeMarketData:
             return True
             
         path = r"C:\Program Files\BridgeMarkets MetaTrader 5\terminal64.exe"
-        log_debug(f"--- INTENTANDO CONEXIÓN INICIAL A MT5 (Acc: {self.login}) ---")
+        log_debug(f"--- INTENTANDO CONEXION INICIAL A MT5 (Acc: {self.login}) ---")
         
-        # Inicialización con login directo
-        if not mt5.initialize(path=path, login=self.login, password=self.password, server="BridgeMarkets-MT5"):
-            log_debug(f"--- FALLO CRITICO INICIALIZACION: {mt5.last_error()} ---")
-            self.connected = False
-            return False
+        # Intentar inicializacion directa sin argumentos para enganchar al terminal abierto en GUI al instante
+        if not mt5.initialize():
+            log_debug(f"--- FALLO INICIALIZACION SIN ARGUMENTOS: {mt5.last_error()}, INTENTANDO CON RUTA ---")
+            if not mt5.initialize(path=path, login=self.login, password=self.password, server="BridgeMarkets-MT5"):
+                log_debug(f"--- FALLO CRITICO INICIALIZACION: {mt5.last_error()} ---")
+                self.connected = False
+                return False
         
-        log_debug("--- CONEXIÓN EXITOSA AL NÚCLEO MT5 ---")
+        log_debug("--- CONEXION EXITOSA AL NUCLEO MT5 ---")
         self.connected = True
         return True
 
