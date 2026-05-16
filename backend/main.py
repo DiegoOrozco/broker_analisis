@@ -33,6 +33,25 @@ async def update_config(new_config: dict):
     print(f"--- CONFIGURACIÓN ACTUALIZADA: {CONFIG} ---")
     return CONFIG
 
+# Global state for locked trades
+locked_trades = {}
+
+@app.get("/lock_trade")
+async def get_locked_trade(symbol: str):
+    return locked_trades.get(symbol)
+
+@app.post("/lock_trade")
+async def update_locked_trade(payload: dict):
+    symbol = payload.get("symbol")
+    trade = payload.get("trade")
+    if not trade:
+        if symbol in locked_trades:
+            del locked_trades[symbol]
+    else:
+        locked_trades[symbol] = trade
+    print(f"--- POSICIÓN FIJADA PARA {symbol}: {trade} ---")
+    return {"status": "ok", "locked_trade": trade}
+
 # Global state for signals
 last_signals = {}
 # Global state for tick history per symbol
@@ -51,9 +70,10 @@ async def market_stream(websocket: WebSocket):
 
     async def run_ai_analysis(history):
         ai_res = None
+        locked = locked_trades.get(symbol)
         if CONFIG["use_gemini"]:
             try:
-                res = await brain.analyze_ticks(symbol, history, last_signals.get(symbol))
+                res = await brain.analyze_ticks(symbol, history, last_signals.get(symbol), locked)
                 if isinstance(res, str):
                     clean_res = re.sub(r'```json\n|\n```', '', res)
                     ai_res = json.loads(clean_res)
@@ -78,18 +98,24 @@ async def market_stream(websocket: WebSocket):
                 "confidence_score": ai_res.get("confidence_score", 0.5) if ai_res else 0.5
             }
         else:
-            # Garantizar matemáticamente que el Stop Loss jamás exceda 10 puntos (10 velitas)
-            try:
-                entry = float(ai_res.get("entry_price", history[-1]["price"] if history else 0))
-                sl = float(ai_res.get("stop_loss", 0))
-                if ai_res.get("decision") == "BUY":
-                    if sl < entry - 10.0 or sl >= entry:
-                        ai_res["stop_loss"] = round(entry - 10.0, 2)
-                elif ai_res.get("decision") == "SELL":
-                    if sl > entry + 10.0 or sl <= entry:
-                        ai_res["stop_loss"] = round(entry + 10.0, 2)
-            except Exception as e:
-                print(f"Error ajustando stop loss: {e}")
+            if locked:
+                ai_res["decision"] = locked["decision"]
+                ai_res["entry_price"] = locked["entry_price"]
+                ai_res["stop_loss"] = locked["stop_loss"]
+                ai_res["take_profit"] = locked["take_profit"]
+            else:
+                # Garantizar matemáticamente que el Stop Loss jamás exceda 10 puntos (10 velitas)
+                try:
+                    entry = float(ai_res.get("entry_price", history[-1]["price"] if history else 0))
+                    sl = float(ai_res.get("stop_loss", 0))
+                    if ai_res.get("decision") == "BUY":
+                        if sl < entry - 10.0 or sl >= entry:
+                            ai_res["stop_loss"] = round(entry - 10.0, 2)
+                    elif ai_res.get("decision") == "SELL":
+                        if sl > entry + 10.0 or sl <= entry:
+                            ai_res["stop_loss"] = round(entry + 10.0, 2)
+                except Exception as e:
+                    print(f"Error ajustando stop loss: {e}")
         
         last_signals[symbol] = ai_res
         print(f"--- NUEVA SEÑAL PARA {symbol}: {ai_res['decision']} ---")
@@ -125,7 +151,8 @@ async def market_stream(websocket: WebSocket):
             payload = {
                 "type": "TICK",
                 "data": tick,
-                "ai_signal": last_signals.get(symbol)
+                "ai_signal": last_signals.get(symbol),
+                "locked_trade": locked_trades.get(symbol)
             }
             await websocket.send_json(payload)
             # print(f"--- TICK ENVIADO: {tick['price']} ---")

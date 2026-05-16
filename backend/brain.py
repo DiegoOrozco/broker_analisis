@@ -59,18 +59,35 @@ class TradingBrain:
             system_instruction=self.system_instruction
         )
 
-    async def analyze_ticks(self, symbol, ticks_history, prev_signal=None):
+    async def analyze_ticks(self, symbol, ticks_history, prev_signal=None, locked_trade=None):
         """
         Sends historical market context to Gemini for decision making (Async).
         """
         prev_decision = prev_signal.get('decision') if prev_signal else 'WAIT'
         prev_reason = prev_signal.get('reason') if prev_signal else 'Inicio de análisis'
 
+        locked_context = ""
+        if locked_trade:
+            locked_context = f"""
+        ### OPERACIÓN BLOQUEADA / FIJADA POR EL USUARIO EN CURSO ###
+        - ATENCIÓN: El usuario TIENE UNA POSICIÓN REAL ACTIVA en {locked_trade.get('decision')} a un precio de entrada de {locked_trade.get('entry_price')}.
+        - Stop Loss fijado por el usuario: {locked_trade.get('stop_loss')}
+        - Take Profit fijado por el usuario: {locked_trade.get('take_profit')}
+        
+        MISIÓN DE GESTIÓN:
+        - Como el usuario ya entró, tu tarea no es darle una nueva señal desde cero, sino GESTIONAR LA POSICIÓN ACTUAL.
+        - Evalúa si el precio actual sigue respetando el Stop Loss y si el momentum se dirige al Take Profit.
+        - Si el trade va bien, mantén la decisión ("BUY" o "SELL") y en "reason" y "forecast" explica el progreso del trade hacia el Take Profit.
+        - Mantén ESTRICTAMENTE los mismos entry_price, stop_loss y take_profit de la posición fijada en el JSON de salida.
+        - Si detectas que el quiebre falló y la estructura se colapsa con violencia en contra, cambia decision a "EXIT" o "SALIR" para recomendar el cierre manual de emergencia.
+        """
+
         prompt = f"""
         ### DATOS DEL MERCADO ACTUAL (VENTANA HISTÓRICA) ###
         - Índice: {symbol}
         - Total de Ticks en memoria: {len(ticks_history)}
         - Estado Sugerido Anterior: {prev_decision} ({prev_reason})
+        {locked_context}
         - Historial Cronológico de Ticks (del más antiguo al más reciente):
         {ticks_history}
         
