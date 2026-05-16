@@ -259,7 +259,8 @@ async def market_stream(websocket: WebSocket):
                 "type": "TICK",
                 "data": tick,
                 "ai_signal": last_signals.get(symbol),
-                "locked_trade": locked_trades.get(symbol)
+                "locked_trade": locked_trades.get(symbol),
+                "open_positions": market_provider.get_open_positions()
             }
             await websocket.send_json(payload)
             # print(f"--- TICK ENVIADO: {tick['price']} ---")

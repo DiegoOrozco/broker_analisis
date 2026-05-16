@@ -14,6 +14,7 @@ function App() {
   const [lotSize, setLotSize] = useState(0.20)
   const [monitoredSymbols, setMonitoredSymbols] = useState([])
   const [tradeHistory, setTradeHistory] = useState([])
+  const [openPositions, setOpenPositions] = useState([])
   
   const ws = useRef(null)
   const API_BASE = "http://100.75.221.54:8000"
@@ -265,6 +266,9 @@ function App() {
                 return [{...trade, symbol: selectedSymbol, time: new Date().toLocaleTimeString()}, ...prev]
               })
             }
+          }
+          if (payload.open_positions) {
+            setOpenPositions(payload.open_positions)
           }
         } else if (payload.type === 'ERROR') {
           addLog(`ERROR MT5: ${payload.message}`)
@@ -525,6 +529,81 @@ function App() {
               {lastSignal?.is_continuation ? 'Tendencia sólida detectada.' : 'Movimiento de respiro/retest.'}
            </p>
         </div>
+      </div>
+
+      <div className="card" style={{marginTop: '30px', animation: 'fadeIn 0.6s', border: '1px solid rgba(255, 255, 255, 0.15)', background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%)', boxShadow: '0 10px 40px rgba(0,0,0,0.5)'}}>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px'}}>
+          <div>
+            <h3 style={{display: 'flex', alignItems: 'center', gap: '10px', margin: 0, fontSize: '1.3rem', color: 'white'}}>
+              💼 PORTAFOLIO EN VIVO DE MT5 (POSICIONES ABIERTAS)
+            </h3>
+            <div style={{color: 'var(--text-dim)', fontSize: '0.9rem', marginTop: '4px'}}>
+              Monitoreo en tiempo real de órdenes activas y su beneficio / pérdida neta flotante
+            </div>
+          </div>
+          <div style={{display: 'flex', alignItems: 'center', gap: '15px', background: 'rgba(0,0,0,0.3)', padding: '10px 20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)'}}>
+            <span style={{color: 'var(--text-dim)', fontSize: '0.9rem'}}>P&L Total Flotante:</span>
+            <strong style={{fontSize: '1.3rem', fontFamily: 'JetBrains Mono, monospace', color: openPositions.reduce((sum, p) => sum + p.profit, 0) >= 0 ? 'var(--success)' : 'var(--danger)'}}>
+              {openPositions.reduce((sum, p) => sum + p.profit, 0) >= 0 ? '+' : ''}
+              ${openPositions.reduce((sum, p) => sum + p.profit, 0).toFixed(2)} USD
+            </strong>
+          </div>
+        </div>
+
+        {openPositions.length === 0 ? (
+          <div style={{padding: '35px', textAlign: 'center', color: 'var(--text-dim)', fontStyle: 'italic', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)'}}>
+            💤 No hay operaciones abiertas en MetaTrader 5 en este momento.
+          </div>
+        ) : (
+          <div style={{overflowX: 'auto'}}>
+            <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.95rem'}}>
+              <thead>
+                <tr style={{borderBottom: '2px solid rgba(255,255,255,0.1)', color: 'var(--text-dim)', background: 'rgba(0,0,0,0.2)'}}>
+                  <th style={{padding: '14px 12px'}}>Ticket</th>
+                  <th style={{padding: '14px 12px'}}>Símbolo</th>
+                  <th style={{padding: '14px 12px'}}>Tipo</th>
+                  <th style={{padding: '14px 12px'}}>Volumen</th>
+                  <th style={{padding: '14px 12px'}}>Precio Entrada</th>
+                  <th style={{padding: '14px 12px'}}>Precio Actual</th>
+                  <th style={{padding: '14px 12px'}}>SL / TP</th>
+                  <th style={{padding: '14px 12px', textAlign: 'right'}}>Beneficio (USD)</th>
+                  <th style={{padding: '14px 12px', textAlign: 'center'}}>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {openPositions.map((pos) => (
+                  <tr key={pos.ticket} style={{borderBottom: '1px solid rgba(255,255,255,0.06)', transition: 'background 0.2s'}} onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{padding: '14px 12px', fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-dim)'}}>#{pos.ticket}</td>
+                    <td style={{padding: '14px 12px', fontWeight: 'bold', color: 'white'}}>{pos.symbol}</td>
+                    <td style={{padding: '14px 12px'}}>
+                      <span style={{padding: '4px 10px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', background: pos.type === 'BUY' ? 'rgba(38, 166, 154, 0.15)' : 'rgba(239, 83, 80, 0.15)', color: pos.type === 'BUY' ? 'var(--success)' : 'var(--danger)', border: `1px solid ${pos.type === 'BUY' ? 'var(--success)' : 'var(--danger)'}`}}>
+                        {pos.type}
+                      </span>
+                    </td>
+                    <td style={{padding: '14px 12px', fontFamily: 'JetBrains Mono, monospace'}}>{pos.volume}</td>
+                    <td style={{padding: '14px 12px', fontFamily: 'JetBrains Mono, monospace'}}>{pos.open_price}</td>
+                    <td style={{padding: '14px 12px', fontFamily: 'JetBrains Mono, monospace', fontWeight: 'bold', color: 'var(--accent-primary)'}}>{pos.current_price}</td>
+                    <td style={{padding: '14px 12px', fontSize: '0.85rem'}}>
+                      <div style={{color: 'var(--danger)', fontFamily: 'JetBrains Mono, monospace'}}>SL: {pos.sl || '---'}</div>
+                      <div style={{color: 'var(--success)', fontFamily: 'JetBrains Mono, monospace'}}>TP: {pos.tp || '---'}</div>
+                    </td>
+                    <td style={{padding: '14px 12px', textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontWeight: 'bold', fontSize: '1.1rem', color: pos.profit >= 0 ? 'var(--success)' : 'var(--danger)'}}>
+                      {pos.profit >= 0 ? '+' : ''}${pos.profit.toFixed(2)}
+                    </td>
+                    <td style={{padding: '14px 12px', textAlign: 'center'}}>
+                      <button 
+                        onClick={() => closeDirectManualTrade(pos.ticket)}
+                        style={{background: 'var(--danger)', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '6px', boxShadow: '0 0 10px rgba(239, 83, 80, 0.4)', transition: 'all 0.2s'}}
+                      >
+                        🔴 Cerrar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{marginTop: '30px', animation: 'fadeIn 0.6s'}}>
