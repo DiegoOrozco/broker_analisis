@@ -43,15 +43,16 @@ class TradingBrain:
 
         ### Formato de Salida Obligatorio (JSON sin backticks extra):
         {{
-          "decision": "BUY" | "SELL" | "WAIT",
-          "type": "Breakout" | "Continuación" | "Scalping" | "Reversión" | "Espera",
+          "decision": "BUY" | "SELL" | "WAIT" | "PENDING_BUY" | "PENDING_SELL",
+          "type": "Breakout" | "Continuación" | "Scalping" | "Reversión" | "Espera" | "Orden Programada",
           "is_continuation": true | false,
-          "reason": "Explicación súper precisa, citando el manual, de por qué se toma esta decisión basado en Gann/KLRR/E-Draw actual",
-          "forecast": "Pronóstico proactivo: Basado en las características de ESTE índice específico en el manual que acabas de leer, ¿qué movimiento fuerte se está gestando y hacia dónde nos vamos a montar a corto/mediano plazo?",
+          "reason": "Explicación súper precisa, citando el manual, de por qué se toma esta decisión. Si es PENDING_BUY/SELL, explica por qué ese precio futuro es el punto clave.",
+          "forecast": "Pronóstico proactivo: Basado en las características de ESTE índice específico, ¿qué movimiento fuerte se gesta a mediano plazo?",
+          "target_entry_price": float (SOLO si la decisión es PENDING_BUY o PENDING_SELL, indica el precio exacto futuro donde debe activarse. Si es BUY, SELL o WAIT pon 0),
           "entry_price": float (precio actual estimado),
           "stop_loss": float (calculado por ti),
           "take_profit": float (calculado por ti),
-          "confidence_score": 0.0 a 1.0 (debe ser >0.66 para entrar)
+          "confidence_score": 0.0 a 1.0 (debe ser >0.66 para entrar o programar)
         }}
         """
         self.model = genai.GenerativeModel(

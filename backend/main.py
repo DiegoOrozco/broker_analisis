@@ -233,31 +233,60 @@ async def run_ai_analysis_global(symbol, history):
             except Exception as e:
                 print(f"Error ajustando stop loss: {e}")
                 
+        # 🛑 PREVENCIÓN DE DUPLICADOS: Verificar si hay órdenes pendientes activas
+        open_orders = market_provider.get_open_orders(symbol)
+        if open_orders and ai_res.get("decision") in ["BUY", "SELL", "PENDING_BUY", "PENDING_SELL"]:
+            # Ya hay una orden programada esperando llegar al precio
+            ai_res["decision"] = "WAIT"
+            ai_res["reason"] = f"⏳ [ORDEN PROGRAMADA ACTIVA] Ya existe una orden pendiente esperando en {open_orders[0].get('target_price')}. Suspendiendo nuevas entradas hasta que se active o cancele."
+            
         # Auto-Trading Execution
-        if CONFIG.get("auto_trade") and ai_res.get("decision") in ["BUY", "SELL"] and not locked:
+        if CONFIG.get("auto_trade") and ai_res.get("decision") in ["BUY", "SELL", "PENDING_BUY", "PENDING_SELL"] and not locked:
             if float(ai_res.get("confidence_score", 0)) >= 0.75:
-                print(f"--- [SNIPER] INICIANDO AUTO-TRADING SNIPER PARA {symbol} ---")
-                trade_result = market_provider.execute_trade(
-                    symbol=symbol,
-                    decision=ai_res["decision"],
-                    lot_size=CONFIG.get("lot_size", 0.20),
-                    sl=ai_res["stop_loss"],
-                    tp=ai_res["take_profit"]
-                )
-                if trade_result.get("success"):
-                    # Lock trade automatically
-                    locked_trades[symbol] = {
-                        "decision": ai_res["decision"],
-                        "entry_price": trade_result["price"],
-                        "stop_loss": ai_res["stop_loss"],
-                        "take_profit": ai_res["take_profit"],
-                        "ticket": trade_result["ticket"]
-                    }
-                    ai_res["entry_price"] = trade_result["price"]
-                    ai_res["reason"] = f"[EXITO AUTO-TRADE] EJECUTADO (Ticket: {trade_result['ticket']}). " + ai_res.get("reason", "")
-                    print(f"--- [EXITO] AUTO-TRADE EXITOSO. POSICION BLOQUEADA. ---")
+                decision = ai_res["decision"]
+                if "PENDING" in decision:
+                    target_price = float(ai_res.get("target_entry_price", history[-1]["price"]))
+                    if target_price <= 0:
+                        target_price = history[-1]["price"]
+                        
+                    print(f"--- [PROGRAMADA] INICIANDO ORDEN PENDIENTE PARA {symbol} EN {target_price} ---")
+                    trade_result = market_provider.execute_pending_order(
+                        symbol=symbol,
+                        decision=decision.replace("PENDING_", ""),
+                        lot_size=CONFIG.get("lot_size", 0.20),
+                        target_price=target_price,
+                        sl=ai_res["stop_loss"],
+                        tp=ai_res["take_profit"]
+                    )
+                    
+                    if trade_result.get("success"):
+                        ai_res["reason"] = f"🎯 [EXITO PENDIENTE] ORDEN PROGRAMADA (Ticket: {trade_result['ticket']}) para ejecutarse en {target_price}. " + ai_res.get("reason", "")
+                        print(f"--- [EXITO] ORDEN PROGRAMADA EXITOSA. ESPERANDO AL MERCADO. ---")
+                    else:
+                        ai_res["reason"] = f"[ERROR PENDIENTE]: {trade_result.get('error')}. " + ai_res.get("reason", "")
                 else:
-                    ai_res["reason"] = f"[ERROR AUTO-TRADE]: {trade_result.get('error')}. " + ai_res.get("reason", "")
+                    print(f"--- [SNIPER] INICIANDO AUTO-TRADING SNIPER PARA {symbol} ---")
+                    trade_result = market_provider.execute_trade(
+                        symbol=symbol,
+                        decision=decision,
+                        lot_size=CONFIG.get("lot_size", 0.20),
+                        sl=ai_res["stop_loss"],
+                        tp=ai_res["take_profit"]
+                    )
+                    if trade_result.get("success"):
+                        # Lock trade automatically
+                        locked_trades[symbol] = {
+                            "decision": decision,
+                            "entry_price": trade_result["price"],
+                            "stop_loss": ai_res["stop_loss"],
+                            "take_profit": ai_res["take_profit"],
+                            "ticket": trade_result["ticket"]
+                        }
+                        ai_res["entry_price"] = trade_result["price"]
+                        ai_res["reason"] = f"✅ [EXITO AUTO-TRADE] EJECUTADO A MERCADO (Ticket: {trade_result['ticket']}). " + ai_res.get("reason", "")
+                        print(f"--- [EXITO] AUTO-TRADE EXITOSO. POSICION BLOQUEADA. ---")
+                    else:
+                        ai_res["reason"] = f"[ERROR AUTO-TRADE]: {trade_result.get('error')}. " + ai_res.get("reason", "")
     
     last_signals[symbol] = ai_res
     print(f"--- NUEVA SENAL PARA {symbol}: {ai_res['decision']} ---")

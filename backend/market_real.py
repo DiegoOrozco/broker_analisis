@@ -278,6 +278,78 @@ class BridgeMarketData:
             })
         return result
 
+    def execute_pending_order(self, symbol, decision, lot_size, target_price, sl, tp):
+        if not self.connected:
+            return {"success": False, "error": "No conectado a MT5"}
+            
+        mt5.symbol_select(symbol, True)
+        tick = mt5.symbol_info_tick(symbol)
+        if not tick:
+            return {"success": False, "error": "No hay tick de mercado actual"}
+            
+        current_price = tick.ask if "BUY" in decision else tick.bid
+        
+        if "BUY" in decision:
+            if target_price < current_price:
+                order_type = mt5.ORDER_TYPE_BUY_LIMIT
+            else:
+                order_type = mt5.ORDER_TYPE_BUY_STOP
+        else:
+            if target_price > current_price:
+                order_type = mt5.ORDER_TYPE_SELL_LIMIT
+            else:
+                order_type = mt5.ORDER_TYPE_SELL_STOP
+                
+        request = {
+            "action": mt5.TRADE_ACTION_PENDING,
+            "symbol": symbol,
+            "volume": float(lot_size),
+            "type": order_type,
+            "price": float(target_price),
+            "sl": float(sl),
+            "tp": float(tp),
+            "deviation": 300,
+            "magic": 234001,
+            "comment": "Antigravity Pending",
+            "type_time": mt5.ORDER_TIME_GTC,
+        }
+        
+        result = mt5.order_send(request)
+        if result.retcode == mt5.TRADE_RETCODE_DONE:
+            log_debug(f"¡ORDEN PENDIENTE EJECUTADA EN MT5! {decision} en {symbol} a {target_price}. Ticket: {result.order}")
+            return {
+                "success": True,
+                "ticket": result.order,
+                "target_price": target_price,
+                "volume": result.volume
+            }
+            
+        error_msg = f"Orden pendiente rechazada: {result.comment} (Code: {result.retcode})"
+        log_debug(error_msg)
+        return {"success": False, "error": error_msg}
+
+    def get_open_orders(self, symbol=None):
+        if not self.connected:
+            return []
+            
+        orders = mt5.orders_get() if not symbol else mt5.orders_get(symbol=symbol)
+        if not orders:
+            return []
+            
+        result = []
+        for ord in orders:
+            result.append({
+                "ticket": ord.ticket,
+                "symbol": ord.symbol,
+                "type": ord.type,
+                "volume": ord.volume_initial,
+                "target_price": ord.price_open,
+                "sl": ord.sl,
+                "tp": ord.tp,
+                "comment": ord.comment
+            })
+        return result
+
     def close(self):
         mt5.shutdown()
 
