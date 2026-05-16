@@ -254,6 +254,30 @@ class BridgeMarketData:
         log_debug(error_msg)
         return {"success": False, "error": error_msg}
 
+    def get_open_positions(self, symbol=None):
+        if not self.connected:
+            return []
+            
+        positions = mt5.positions_get() if not symbol else mt5.positions_get(symbol=symbol)
+        if not positions:
+            return []
+            
+        result = []
+        for pos in positions:
+            result.append({
+                "ticket": pos.ticket,
+                "symbol": pos.symbol,
+                "type": "BUY" if pos.type == mt5.ORDER_TYPE_BUY else "SELL",
+                "volume": pos.volume,
+                "open_price": pos.price_open,
+                "current_price": pos.price_current,
+                "sl": pos.sl,
+                "tp": pos.tp,
+                "profit": round(pos.profit, 2),
+                "comment": pos.comment
+            })
+        return result
+
     def close(self):
         mt5.shutdown()
 
