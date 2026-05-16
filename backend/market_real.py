@@ -25,10 +25,10 @@ class BridgeMarketData:
         if self.connected:
             return True
             
-        path = r"C:\Program Files\BridgeMarkets MetaTrader 5\terminal64.exe"
         log_debug(f"--- INTENTANDO CONEXION INICIAL A MT5 (Acc: {self.login}) ---")
         
-        if not mt5.initialize(path=path):
+        # Inicializacion sin argumentos para enganchar de inmediato al terminal activo en GUI
+        if not mt5.initialize():
             log_debug(f"--- FALLO INICIALIZACION MT5: {mt5.last_error()} ---")
             self.connected = False
             return False
