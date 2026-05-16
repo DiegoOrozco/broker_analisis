@@ -33,7 +33,7 @@ async def get_config():
 @app.post("/config")
 async def update_config(new_config: dict):
     CONFIG.update(new_config)
-    print(f"--- CONFIGURACIÓN ACTUALIZADA: {CONFIG} ---")
+    print(f"--- CONFIGURACION ACTUALIZADA: {CONFIG} ---")
     return CONFIG
 
 # Global state for locked trades
@@ -52,7 +52,7 @@ async def update_locked_trade(payload: dict):
             del locked_trades[symbol]
     else:
         locked_trades[symbol] = trade
-    print(f"--- POSICIÓN FIJADA PARA {symbol}: {trade} ---")
+    print(f"--- POSICION FIJADA PARA {symbol}: {trade} ---")
     return {"status": "ok", "locked_trade": trade}
 
 @app.post("/execute_manual_trade")
@@ -63,7 +63,7 @@ async def execute_manual_trade(payload: dict):
     tp = payload.get("take_profit", 0)
     lot_size = CONFIG.get("lot_size", 0.20)
     
-    print(f"--- 🚀 DISPARO MANUAL SOLICITADO DESDE EL DASHBOARD: {decision} en {symbol} ---")
+    print(f"--- [DISPARO MANUAL] SOLICITADO DESDE EL DASHBOARD: {decision} en {symbol} ---")
     trade_result = market_provider.execute_trade(
         symbol=symbol,
         decision=decision,
@@ -80,10 +80,10 @@ async def execute_manual_trade(payload: dict):
             "take_profit": tp,
             "ticket": trade_result["ticket"]
         }
-        print(f"--- ✅ DISPARO EXITOSO (Ticket #{trade_result['ticket']}). POSICIÓN FIJADA. ---")
+        print(f"--- [EXITO] DISPARO EXITOSO (Ticket #{trade_result['ticket']}). POSICION FIJADA. ---")
         return {"success": True, "locked_trade": locked_trades[symbol]}
     else:
-        print(f"--- ⚠️ ERROR DISPARANDO ORDEN: {trade_result.get('error')} ---")
+        print(f"--- [ERROR] DISPARANDO ORDEN: {trade_result.get('error')} ---")
         return {"success": False, "error": trade_result.get("error")}
 
 # Global state for signals
@@ -144,7 +144,7 @@ async def run_ai_analysis_global(symbol, history):
         # Auto-Trading Execution
         if CONFIG.get("auto_trade") and ai_res.get("decision") in ["BUY", "SELL"] and not locked:
             if float(ai_res.get("confidence_score", 0)) >= 0.75:
-                print(f"--- 🚀 INICIANDO AUTO-TRADING SNIPER PARA {symbol} ---")
+                print(f"--- [SNIPER] INICIANDO AUTO-TRADING SNIPER PARA {symbol} ---")
                 trade_result = market_provider.execute_trade(
                     symbol=symbol,
                     decision=ai_res["decision"],
@@ -162,13 +162,13 @@ async def run_ai_analysis_global(symbol, history):
                         "ticket": trade_result["ticket"]
                     }
                     ai_res["entry_price"] = trade_result["price"]
-                    ai_res["reason"] = f"✅ AUTO-TRADE EJECUTADO (Ticket: {trade_result['ticket']}). " + ai_res.get("reason", "")
-                    print(f"--- ✅ AUTO-TRADE EXITOSO. POSICIÓN BLOQUEADA. ---")
+                    ai_res["reason"] = f"[EXITO AUTO-TRADE] EJECUTADO (Ticket: {trade_result['ticket']}). " + ai_res.get("reason", "")
+                    print(f"--- [EXITO] AUTO-TRADE EXITOSO. POSICION BLOQUEADA. ---")
                 else:
-                    ai_res["reason"] = f"⚠️ ERROR AUTO-TRADE: {trade_result.get('error')}. " + ai_res.get("reason", "")
+                    ai_res["reason"] = f"[ERROR AUTO-TRADE]: {trade_result.get('error')}. " + ai_res.get("reason", "")
     
     last_signals[symbol] = ai_res
-    print(f"--- NUEVA SEÑAL PARA {symbol}: {ai_res['decision']} ---")
+    print(f"--- NUEVA SENAL PARA {symbol}: {ai_res['decision']} ---")
 
 def check_trailing_stop(symbol, cur_price):
     """ Mueve el Stop Loss a Breakeven y lo persigue (Trailing Stop) en MT5 """
@@ -187,7 +187,7 @@ def check_trailing_stop(symbol, cur_price):
                     res = market_provider.modify_trade(symbol, ticket, new_sl, tp)
                     if res.get("success"):
                         locked_trades[symbol]["stop_loss"] = new_sl
-                        print(f"🛡️ TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
+                        print(f"[TRAILING] TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
         elif decision == "SELL":
             if cur_price <= entry - 5.0:
                 new_sl = round(min(sl if sl > 0 else entry + 10, entry - 0.5, cur_price + 4.5), 2)
@@ -195,17 +195,17 @@ def check_trailing_stop(symbol, cur_price):
                     res = market_provider.modify_trade(symbol, ticket, new_sl, tp)
                     if res.get("success"):
                         locked_trades[symbol]["stop_loss"] = new_sl
-                        print(f"🛡️ TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
+                        print(f"[TRAILING] TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
     symbol = websocket.query_params.get("symbol", "Fortune100.")
-    print(f"--- NUEVO INTENTO DE CONEXIÓN WS: {symbol} ---")
+    print(f"--- NUEVO INTENTO DE CONEXION WS: {symbol} ---")
     await websocket.accept()
-    print(f"--- CONEXIÓN WS ACEPTADA PARA {symbol} ---")
+    print(f"--- CONEXION WS ACEPTADA PARA {symbol} ---")
     
     if symbol not in tick_histories:
-        print(f"--- ⚡ PRECARGANDO HISTORIAL DE MT5 PARA {symbol} ---")
+        print(f"--- [PRELOAD] PRECARGANDO HISTORIAL DE MT5 PARA {symbol} ---")
         tick_histories[symbol] = market_provider.preload_history(symbol, MAX_HISTORY)
 
     try:
@@ -255,15 +255,15 @@ async def market_stream(websocket: WebSocket):
             f.write(error_msg + "\n")
 
 async def background_scanner():
-    """ Tarea en segundo plano para escanear múltiples índices sin requerir WS activo """
-    print("--- 📡 INICIANDO RADAR MULTI-OBJETIVO (BACKGROUND SCANNER) ---")
+    """ Tarea en segundo plano para escanear multiples indices sin requerir WS activo """
+    print("--- [RADAR] INICIANDO RADAR MULTI-OBJETIVO (BACKGROUND SCANNER) ---")
     iteration = 0
     while True:
         try:
             monitored = CONFIG.get("monitored_symbols", [])
             for symbol in monitored:
                 if symbol not in tick_histories:
-                    print(f"--- ⚡ PRECARGANDO HISTORIAL DE MT5 PARA {symbol} ---")
+                    print(f"--- [PRELOAD] PRECARGANDO HISTORIAL DE MT5 PARA {symbol} ---")
                     tick_histories[symbol] = market_provider.preload_history(symbol, MAX_HISTORY)
                     
                 tick = market_provider.get_next_tick(symbol)
