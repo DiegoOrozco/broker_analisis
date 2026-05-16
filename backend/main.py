@@ -113,6 +113,7 @@ def detect_spike_setup(symbol, history):
     """
     Algoritmo Matemático de Alta Precisión (Spike Hunter)
     Analiza la compresión del precio para detectar Spikes inminentes en BullX y BearX.
+    Ahora con Detección de Continuación de Tendencia (Macro-Run).
     """
     if len(history) < 25 or ("Bull" not in symbol and "Bear" not in symbol):
         return None
@@ -121,43 +122,88 @@ def detect_spike_setup(symbol, history):
     first_price = recent[0]["price"]
     last_price = recent[-1]["price"]
     
-    # Buscar si ya hubo un spike reciente (salto grande entre 2 ticks)
-    for i in range(1, len(recent)):
-        diff = recent[i]["price"] - recent[i-1]["price"]
-        if "Bull" in symbol and diff > 3.0: # Spike alcista ya ocurrió
-            return None
-        if "Bear" in symbol and diff < -3.0: # Spike bajista ya ocurrió
+    macro_trend = 0
+    if len(history) >= 100:
+        macro_trend = last_price - history[-100]["price"]
+    
+    if "Bull" in symbol:
+        # Verificar si acaba de ocurrir un spike en los ultimísimos ticks (para no comprar la cima)
+        just_spiked = False
+        for i in range(len(recent) - 5, len(recent)):
+            if recent[i]["price"] - recent[i-1]["price"] > 2.0:
+                just_spiked = True
+                
+        if just_spiked:
             return None
             
-    if "Bull" in symbol:
         drop = first_price - last_price
-        # Si ha caído sostenidamente más de 3.5 puntos sin spikes, está a punto de reventar al alza
+        
+        # LÓGICA 1: Compresión normal (Mercado lateral/bajista)
         if drop >= 3.5:
             return {
                 "decision": "BUY",
                 "type": "🚀 SPIKE HUNTER ENTRY",
                 "is_continuation": False,
-                "reason": f"🔥 [Cazador de Spikes] Compresión extrema de {round(drop, 2)} puntos a la baja sin retroceso. Spike ALCISTA inminente garantizado por comportamiento del índice.",
-                "forecast": "Ruptura violenta al alza (Spike masivo).",
+                "reason": f"🔥 [Cazador] Compresión de {round(drop, 2)} puntos. Spike ALCISTA inminente garantizado.",
+                "forecast": "Ruptura violenta al alza.",
                 "entry_price": last_price,
                 "stop_loss": round(last_price - 10.0, 2),
                 "take_profit": round(last_price + 30.0, 2),
                 "confidence_score": 0.98
             }
+        
+        # LÓGICA 2: Continuación de Tendencia (El índice está en modo cohete)
+        # Si la tendencia macro es fuertemente alcista (> 10 puntos) y vemos un pequeño dip (>= 1.5)
+        elif macro_trend >= 10.0 and drop >= 1.5:
+            return {
+                "decision": "BUY",
+                "type": "📈 TREND RIDER",
+                "is_continuation": True,
+                "reason": f"🌊 [Trend Rider] Fuerte Rally Alcista detectado (+{round(macro_trend, 2)} pts). Micro-retroceso de {round(drop, 2)} pts completado. Entrando para surfear el próximo Spike de la serie.",
+                "forecast": "Continuación agresiva de la tendencia alcista.",
+                "entry_price": last_price,
+                "stop_loss": round(last_price - 8.0, 2),
+                "take_profit": round(last_price + 40.0, 2), # TP más ambicioso en tendencias
+                "confidence_score": 0.95
+            }
             
     elif "Bear" in symbol:
+        just_spiked = False
+        for i in range(len(recent) - 5, len(recent)):
+            if recent[i]["price"] - recent[i-1]["price"] < -2.0:
+                just_spiked = True
+                
+        if just_spiked:
+            return None
+            
         rise = last_price - first_price
+        
+        # LÓGICA 1: Compresión normal
         if rise >= 3.5:
             return {
                 "decision": "SELL",
                 "type": "☄️ SPIKE HUNTER ENTRY",
                 "is_continuation": False,
-                "reason": f"🔥 [Cazador de Spikes] Compresión extrema de {round(rise, 2)} puntos al alza sin retroceso. Spike BAJISTA inminente garantizado por comportamiento del índice.",
-                "forecast": "Colapso violento a la baja (Spike masivo).",
+                "reason": f"🔥 [Cazador] Compresión de {round(rise, 2)} puntos. Spike BAJISTA inminente.",
+                "forecast": "Colapso violento a la baja.",
                 "entry_price": last_price,
                 "stop_loss": round(last_price + 10.0, 2),
                 "take_profit": round(last_price - 30.0, 2),
                 "confidence_score": 0.98
+            }
+            
+        # LÓGICA 2: Continuación de Tendencia Bajista
+        elif macro_trend <= -10.0 and rise >= 1.5:
+            return {
+                "decision": "SELL",
+                "type": "📉 TREND RIDER",
+                "is_continuation": True,
+                "reason": f"🌊 [Trend Rider] Fuerte Colapso Bajista detectado ({round(macro_trend, 2)} pts). Micro-retroceso alcista de {round(rise, 2)} pts. Entrando para el próximo Spike bajista.",
+                "forecast": "Continuación agresiva de la tendencia bajista.",
+                "entry_price": last_price,
+                "stop_loss": round(last_price + 8.0, 2),
+                "take_profit": round(last_price - 40.0, 2),
+                "confidence_score": 0.95
             }
             
     return None
