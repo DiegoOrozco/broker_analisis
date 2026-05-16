@@ -73,6 +73,48 @@ class BridgeMarketData:
             log_debug(f"Error en tick {symbol}: {e}")
             return None
 
+    def execute_trade(self, symbol, decision, lot_size, sl, tp):
+        if not self.connected:
+            return {"success": False, "error": "No conectado a MT5"}
+            
+        mt5.symbol_select(symbol, True)
+        symbol_info = mt5.symbol_info(symbol)
+        if symbol_info is None:
+            return {"success": False, "error": f"Símbolo no encontrado: {symbol}"}
+            
+        point = symbol_info.point
+        tick = mt5.symbol_info_tick(symbol)
+        price = tick.ask if decision == "BUY" else tick.bid
+        
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": float(lot_size),
+            "type": mt5.ORDER_TYPE_BUY if decision == "BUY" else mt5.ORDER_TYPE_SELL,
+            "price": price,
+            "sl": float(sl),
+            "tp": float(tp),
+            "deviation": 20,
+            "magic": 234000,
+            "comment": "Antigravity AI Sniper",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_FOK,
+        }
+        
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            error_msg = f"Orden rechazada: {result.comment} (Code: {result.retcode})"
+            log_debug(error_msg)
+            return {"success": False, "error": error_msg}
+            
+        log_debug(f"¡ORDEN EJECUTADA EN MT5! {decision} en {symbol} a {price}. Ticket: {result.order}")
+        return {
+            "success": True,
+            "ticket": result.order,
+            "price": result.price,
+            "volume": result.volume
+        }
+
     def close(self):
         mt5.shutdown()
 

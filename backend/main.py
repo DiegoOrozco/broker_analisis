@@ -20,7 +20,9 @@ brain = TradingBrain()
 
 # Global state for configuration
 CONFIG = {
-    "use_gemini": True
+    "use_gemini": True,
+    "auto_trade": False,
+    "lot_size": 0.20
 }
 
 @app.get("/config")
@@ -116,6 +118,32 @@ async def market_stream(websocket: WebSocket):
                             ai_res["stop_loss"] = round(entry + 10.0, 2)
                 except Exception as e:
                     print(f"Error ajustando stop loss: {e}")
+                    
+            # Auto-Trading Execution
+            if CONFIG.get("auto_trade") and ai_res.get("decision") in ["BUY", "SELL"] and not locked:
+                if float(ai_res.get("confidence_score", 0)) >= 0.75:
+                    print(f"--- 🚀 INICIANDO AUTO-TRADING SNIPER PARA {symbol} ---")
+                    trade_result = market_provider.execute_trade(
+                        symbol=symbol,
+                        decision=ai_res["decision"],
+                        lot_size=CONFIG.get("lot_size", 0.20),
+                        sl=ai_res["stop_loss"],
+                        tp=ai_res["take_profit"]
+                    )
+                    if trade_result.get("success"):
+                        # Lock trade automatically
+                        locked_trades[symbol] = {
+                            "decision": ai_res["decision"],
+                            "entry_price": trade_result["price"],
+                            "stop_loss": ai_res["stop_loss"],
+                            "take_profit": ai_res["take_profit"],
+                            "ticket": trade_result["ticket"]
+                        }
+                        ai_res["entry_price"] = trade_result["price"]
+                        ai_res["reason"] = f"✅ AUTO-TRADE EJECUTADO (Ticket: {trade_result['ticket']}). " + ai_res.get("reason", "")
+                        print(f"--- ✅ AUTO-TRADE EXITOSO. POSICIÓN BLOQUEADA. ---")
+                    else:
+                        ai_res["reason"] = f"⚠️ ERROR AUTO-TRADE: {trade_result.get('error')}. " + ai_res.get("reason", "")
         
         last_signals[symbol] = ai_res
         print(f"--- NUEVA SEÑAL PARA {symbol}: {ai_res['decision']} ---")

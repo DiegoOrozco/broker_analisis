@@ -10,6 +10,7 @@ function App() {
   const [lastSignal, setLastSignal] = useState(null)
   const [lockedTrade, setLockedTrade] = useState(null)
   const [useGemini, setUseGemini] = useState(true)
+  const [autoTrade, setAutoTrade] = useState(false)
   
   const ws = useRef(null)
   const API_BASE = "http://100.75.221.54:8000"
@@ -19,7 +20,10 @@ function App() {
     // Fetch initial config and locked trade
     fetch(`${API_BASE}/config`)
       .then(res => res.json())
-      .then(data => setUseGemini(data.use_gemini))
+      .then(data => {
+        setUseGemini(data.use_gemini)
+        setAutoTrade(data.auto_trade)
+      })
       .catch(err => console.error("Error fetching config:", err))
       
     fetch(`${API_BASE}/lock_trade?symbol=${encodeURIComponent(selectedSymbol)}`)
@@ -37,6 +41,18 @@ function App() {
       body: JSON.stringify({ use_gemini: newValue })
     }).then(() => {
       addLog(`IA Gemini ${newValue ? 'ACTIVADA' : 'DESACTIVADA (Modo Ahorro)'}`)
+    })
+  }
+
+  const toggleAutoTrade = () => {
+    const newValue = !autoTrade
+    setAutoTrade(newValue)
+    fetch(`${API_BASE}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto_trade: newValue })
+    }).then(() => {
+      addLog(`🤖 AUTO-TRADING ${newValue ? 'ACTIVADO (Ejecución Directa MT5)' : 'DESACTIVADO (Modo Manual)'}`)
     })
   }
 
@@ -391,6 +407,40 @@ function App() {
                     position: 'absolute',
                     top: '2px',
                     left: useGemini ? '22px' : '2px',
+                    transition: 'all 0.3s'
+                  }} />
+                </button>
+              </div>
+           </div>
+
+           <div className="card" style={{padding: '15px', marginTop: '15px', border: autoTrade ? '1px solid var(--success)' : 'none'}}>
+              <h4 style={{fontSize: '0.8rem', marginBottom: '10px'}}>AUTO-TRADING MT5</h4>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <span style={{fontSize: '0.7rem', color: autoTrade ? 'var(--success)' : 'var(--text-dim)', fontWeight: autoTrade ? 'bold' : 'normal'}}>
+                  {autoTrade ? 'IA DISPARANDO' : 'MODO MANUAL'}
+                </span>
+                <button 
+                  onClick={toggleAutoTrade}
+                  style={{
+                    width: '40px',
+                    height: '20px',
+                    borderRadius: '10px',
+                    background: autoTrade ? 'var(--success)' : 'var(--border)',
+                    border: 'none',
+                    position: 'relative',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                    boxShadow: autoTrade ? '0 0 10px rgba(38, 166, 154, 0.5)' : 'none'
+                  }}
+                >
+                  <div style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    position: 'absolute',
+                    top: '2px',
+                    left: autoTrade ? '22px' : '2px',
                     transition: 'all 0.3s'
                   }} />
                 </button>
