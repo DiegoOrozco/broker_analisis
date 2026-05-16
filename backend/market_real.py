@@ -187,6 +187,49 @@ class BridgeMarketData:
         log_debug(f"¡POSICIÓN {ticket} MODIFICADA EN MT5! SL: {sl}, TP: {tp}")
         return {"success": True, "ticket": ticket, "sl": sl, "tp": tp}
 
+    def close_trade(self, ticket):
+        if not self.connected:
+            return {"success": False, "error": "Sin conexion a MT5"}
+            
+        position = mt5.positions_get(ticket=ticket)
+        if not position or len(position) == 0:
+            return {"success": False, "error": f"Posicion con ticket {ticket} no encontrada en MT5"}
+            
+        pos = position[0]
+        symbol = pos.symbol
+        volume = pos.volume
+        pos_type = pos.type
+        
+        tick = mt5.symbol_info_tick(symbol)
+        if not tick:
+            return {"success": False, "error": f"No se pudo obtener precio para {symbol}"}
+            
+        action_type = mt5.ORDER_TYPE_SELL if pos_type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
+        price = tick.bid if pos_type == mt5.ORDER_TYPE_BUY else tick.ask
+        
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": float(volume),
+            "type": action_type,
+            "position": ticket,
+            "price": price,
+            "deviation": 20,
+            "magic": 234000,
+            "comment": "Antigravity AI Close",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_FOK,
+        }
+        
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            error_msg = f"Cierre rechazado: {result.comment} (Code: {result.retcode})"
+            log_debug(error_msg)
+            return {"success": False, "error": error_msg}
+            
+        log_debug(f"¡POSICION {ticket} CERRADA EN MT5! Simbolo: {symbol}, Volumen: {volume}")
+        return {"success": True, "ticket": ticket, "closed_price": result.price}
+
     def close(self):
         mt5.shutdown()
 
