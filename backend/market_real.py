@@ -127,14 +127,24 @@ class BridgeMarketData:
         tick = mt5.symbol_info_tick(symbol)
         price = tick.ask if decision == "BUY" else tick.bid
         
+        # Recalcular stops de seguridad garantizados respecto al precio real Ask/Bid para evitar retcode 10016
+        stop_dist = 25.0
+        tp_dist = 50.0
+        if decision == "BUY":
+            safe_sl = round(price - stop_dist, 2)
+            safe_tp = round(price + tp_dist, 2)
+        else:
+            safe_sl = round(price + stop_dist, 2)
+            safe_tp = round(price - tp_dist, 2)
+        
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
             "volume": float(lot_size),
             "type": mt5.ORDER_TYPE_BUY if decision == "BUY" else mt5.ORDER_TYPE_SELL,
             "price": price,
-            "sl": float(sl),
-            "tp": float(tp),
+            "sl": float(safe_sl),
+            "tp": float(safe_tp),
             "deviation": 20,
             "magic": 234000,
             "comment": "Antigravity AI Sniper",
