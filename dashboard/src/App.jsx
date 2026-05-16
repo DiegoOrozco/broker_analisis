@@ -123,8 +123,46 @@ function App() {
       body: JSON.stringify({ symbol: selectedSymbol, trade: null })
     }).then(() => {
       setLockedTrade(null)
-      addLog(`🔓 POSICIÓN LIBERADA PARA ${selectedSymbol}`)
+      addLog(`🔓 POSICION LIBERADA PARA ${selectedSymbol}`)
     }).catch(err => console.error("Error unlocking trade:", err))
+  }
+
+  const executeDirectManualTrade = (decision) => {
+    const curPrice = currentTick ? currentTick.price : (lastSignal ? lastSignal.entry_price : 0)
+    if (!curPrice) {
+      alert("Esperando precio en vivo para calcular los niveles de Stop Loss y Take Profit...")
+      return
+    }
+    const sl = decision === 'BUY' ? Math.round((curPrice - 10.0) * 100) / 100 : Math.round((curPrice + 10.0) * 100) / 100
+    const tp = decision === 'BUY' ? Math.round((curPrice + 30.0) * 100) / 100 : Math.round((curPrice - 30.0) * 100) / 100
+
+    const tradePayload = {
+      symbol: selectedSymbol,
+      decision: decision,
+      stop_loss: sl,
+      take_profit: tp
+    }
+
+    addLog(`⏳ DISPARO DE FRANCOTIRADOR MANUAL: Ejecutando orden ${decision} en ${selectedSymbol} a ${curPrice}...`)
+    
+    fetch(`${API_BASE}/execute_manual_trade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tradePayload)
+    }).then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setLockedTrade(data.locked_trade)
+          playAudioAlert('EXECUTE')
+          addLog(`🚀 [DISPARO MANUAL] MT5: ${decision} ejecutado con exito. Ticket #${data.locked_trade.ticket}`)
+        } else {
+          addLog(`⚠️ ERROR DISPARO MT5: ${data.error}`)
+          alert(`No se pudo ejecutar la orden en MT5: ${data.error}`)
+        }
+      }).catch(err => {
+        console.error("Error executing trade:", err)
+        addLog(`⚠️ ERROR DE RED AL DISPARAR: ${err.message}`)
+      })
   }
 
   const playAudioAlert = (type) => {
@@ -403,19 +441,33 @@ function App() {
                </button>
              </div>
            ) : (
-             lastSignal && lastSignal.decision !== 'WAIT' && (
-               <div style={{marginTop: '25px', padding: '16px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px'}}>
-                 <div style={{color: 'var(--text-main)', fontSize: '0.95rem'}}>
-                   ¿Quieres ejecutar esta oportunidad de Francotirador en tu terminal MT5 al instante?
+             <div style={{marginTop: '25px', padding: '18px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'}}>
+               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                 <div style={{color: 'white', fontWeight: 'bold', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                   ⚡ PANEL DE DISPARO RAPIDO MANUAL (MT5 DIRECTO)
                  </div>
+                 <div style={{fontSize: '0.85rem', color: 'var(--text-dim)', background: 'rgba(255, 255, 255, 0.1)', padding: '3px 8px', borderRadius: '4px'}}>
+                   Precio actual: <strong style={{color: 'var(--success)'}}>{currentTick ? currentTick.price : (lastSignal?.entry_price || '---')}</strong>
+                 </div>
+               </div>
+               <div style={{color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '15px'}}>
+                 Ejecuta instantaneamente una orden con tu lote configurado ({lotSize} lotes) y SL protegido de 10 puntos:
+               </div>
+               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
                  <button 
-                   onClick={lockCurrentTrade}
-                   style={{background: 'var(--success)', color: 'white', border: 'none', padding: '10px 22px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', boxShadow: '0 0 15px rgba(38, 166, 154, 0.6)'}}
+                   onClick={() => executeDirectManualTrade('BUY')}
+                   style={{background: 'var(--success)', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '1rem', boxShadow: '0 0 20px rgba(38, 166, 154, 0.4)', transition: 'all 0.2s'}}
                  >
-                   🚀 DISPARAR ORDEN EN VIVO ({lastSignal.decision})
+                   🚀 DISPARAR BUY EN MT5
+                 </button>
+                 <button 
+                   onClick={() => executeDirectManualTrade('SELL')}
+                   style={{background: 'var(--danger)', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '1rem', boxShadow: '0 0 20px rgba(239, 83, 80, 0.4)', transition: 'all 0.2s'}}
+                 >
+                   💥 DISPARAR SELL EN MT5
                  </button>
                </div>
-             )
+             </div>
            )}
         </div>
 
