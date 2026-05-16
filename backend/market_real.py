@@ -51,6 +51,7 @@ class BridgeMarketData:
             if tick is None:
                 # Si no hay tick, probamos reconectar por si acaso
                 error = mt5.last_error()
+                log_debug(f"Tick is None for symbol '{symbol}'. MT5 Error: {error}")
                 if error[0] == -10004: # No IPC
                     self.connected = False
                 return None
