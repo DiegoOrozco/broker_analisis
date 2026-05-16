@@ -115,6 +115,27 @@ class BridgeMarketData:
             "volume": result.volume
         }
 
+    def modify_trade(self, symbol, ticket, sl, tp):
+        if not self.connected:
+            return {"success": False, "error": "No conectado a MT5"}
+            
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "symbol": symbol,
+            "position": int(ticket),
+            "sl": float(sl),
+            "tp": float(tp)
+        }
+        
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            error_msg = f"Modificación SL/TP rechazada: {result.comment} (Code: {result.retcode})"
+            log_debug(error_msg)
+            return {"success": False, "error": error_msg}
+            
+        log_debug(f"¡POSICIÓN {ticket} MODIFICADA EN MT5! SL: {sl}, TP: {tp}")
+        return {"success": True, "ticket": ticket, "sl": sl, "tp": tp}
+
     def close(self):
         mt5.shutdown()
 

@@ -139,6 +139,33 @@ async def run_ai_analysis_global(symbol, history):
     last_signals[symbol] = ai_res
     print(f"--- NUEVA SEÑAL PARA {symbol}: {ai_res['decision']} ---")
 
+def check_trailing_stop(symbol, cur_price):
+    """ Mueve el Stop Loss a Breakeven y lo persigue (Trailing Stop) en MT5 """
+    if symbol in locked_trades and "ticket" in locked_trades[symbol]:
+        trade = locked_trades[symbol]
+        decision = trade["decision"]
+        entry = float(trade["entry_price"])
+        sl = float(trade["stop_loss"])
+        tp = float(trade["take_profit"])
+        ticket = trade["ticket"]
+        
+        if decision == "BUY":
+            if cur_price >= entry + 5.0:
+                new_sl = round(max(sl, entry + 0.5, cur_price - 4.5), 2)
+                if new_sl > sl:
+                    res = market_provider.modify_trade(symbol, ticket, new_sl, tp)
+                    if res.get("success"):
+                        locked_trades[symbol]["stop_loss"] = new_sl
+                        print(f"🛡️ TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
+        elif decision == "SELL":
+            if cur_price <= entry - 5.0:
+                new_sl = round(min(sl if sl > 0 else entry + 10, entry - 0.5, cur_price + 4.5), 2)
+                if new_sl < sl or sl == 0:
+                    res = market_provider.modify_trade(symbol, ticket, new_sl, tp)
+                    if res.get("success"):
+                        locked_trades[symbol]["stop_loss"] = new_sl
+                        print(f"🛡️ TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
+
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
     symbol = websocket.query_params.get("symbol", "Fortune 100.")
@@ -164,6 +191,8 @@ async def market_stream(websocket: WebSocket):
             tick_histories[symbol].append(tick)
             if len(tick_histories[symbol]) > MAX_HISTORY:
                 tick_histories[symbol].pop(0)
+                
+            check_trailing_stop(symbol, tick["price"])
             
             if tick["tick"] == 1 or tick["tick"] % 300 == 0:
                 if symbol not in last_signals:
@@ -211,6 +240,8 @@ async def background_scanner():
                 tick_histories[symbol].append(tick)
                 if len(tick_histories[symbol]) > MAX_HISTORY:
                     tick_histories[symbol].pop(0)
+                
+                check_trailing_stop(symbol, tick["price"])
                 
                 # Ejecutar análisis IA cada 300 iteraciones (~1 minuto) para ahorrar costos de Gemini
                 if iteration % 300 == 0:

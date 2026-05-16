@@ -11,7 +11,9 @@ function App() {
   const [lockedTrade, setLockedTrade] = useState(null)
   const [useGemini, setUseGemini] = useState(true)
   const [autoTrade, setAutoTrade] = useState(false)
+  const [lotSize, setLotSize] = useState(0.20)
   const [monitoredSymbols, setMonitoredSymbols] = useState([])
+  const [tradeHistory, setTradeHistory] = useState([])
   
   const ws = useRef(null)
   const API_BASE = "http://100.75.221.54:8000"
@@ -24,6 +26,7 @@ function App() {
       .then(data => {
         setUseGemini(data.use_gemini)
         setAutoTrade(data.auto_trade)
+        setLotSize(data.lot_size || 0.20)
         setMonitoredSymbols(data.monitored_symbols || [])
       })
       .catch(err => console.error("Error fetching config:", err))
@@ -55,6 +58,19 @@ function App() {
       body: JSON.stringify({ auto_trade: newValue })
     }).then(() => {
       addLog(`🤖 AUTO-TRADING ${newValue ? 'ACTIVADO (Ejecución Directa MT5)' : 'DESACTIVADO (Modo Manual)'}`)
+    })
+  }
+
+  const updateLotSize = (newLot) => {
+    const num = parseFloat(newLot)
+    if (isNaN(num) || num <= 0) return
+    setLotSize(num)
+    fetch(`${API_BASE}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lot_size: num })
+    }).then(() => {
+      addLog(`🎛️ LOTE CONFIGURADO: ${num} lotes para disparos automáticos`)
     })
   }
 
@@ -103,6 +119,38 @@ function App() {
     }).catch(err => console.error("Error unlocking trade:", err))
   }
 
+  const playAudioAlert = (type) => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      
+      if (type === 'SNIPER') {
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(880, ctx.currentTime)
+        osc.frequency.setValueAtTime(1760, ctx.currentTime + 0.15)
+        gain.gain.setValueAtTime(0.3, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.4)
+      } else if (type === 'EXECUTE') {
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime)
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1)
+        osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2)
+        osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3)
+        gain.gain.setValueAtTime(0.4, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.8)
+      }
+    } catch (e) {
+      console.error("Audio API error:", e)
+    }
+  }
+
   useEffect(() => {
     // Limpiar estado al cambiar de índice
     setTicks([])
@@ -132,11 +180,23 @@ function App() {
           setTicks(prev => [...prev.slice(-30), newTick])
           
           if (payload.ai_signal) {
+            const isNewSniper = lastSignal?.decision !== payload.ai_signal.decision && ['BUY', 'SELL'].includes(payload.ai_signal.decision)
+            if (isNewSniper && (payload.ai_signal.confidence_score || 0) >= 0.75) {
+              playAudioAlert('SNIPER')
+            }
             setLastSignal(payload.ai_signal)
             addLog(`NUEVA SEÑAL: ${payload.ai_signal.decision} - ${payload.ai_signal.reason}`)
           }
           if (payload.locked_trade !== undefined) {
-            setLockedTrade(payload.locked_trade || null)
+            const trade = payload.locked_trade || null
+            setLockedTrade(trade)
+            if (trade && trade.ticket) {
+              setTradeHistory(prev => {
+                if (prev.some(t => t.ticket === trade.ticket)) return prev
+                playAudioAlert('EXECUTE')
+                return [{...trade, symbol: selectedSymbol, time: new Date().toLocaleTimeString()}, ...prev]
+              })
+            }
           }
         } else if (payload.type === 'ERROR') {
           addLog(`ERROR MT5: ${payload.message}`)
@@ -369,6 +429,51 @@ function App() {
            </p>
         </div>
       </div>
+
+      <div className="card" style={{marginTop: '30px', animation: 'fadeIn 0.6s'}}>
+        <h3 style={{marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+          <span>📊 Diario de Operaciones (Trade Log & Analytics)</span>
+          <span style={{fontSize: '0.8rem', color: 'var(--text-dim)'}}>Registros Algorítmicos Activos</span>
+        </h3>
+        {tradeHistory.length === 0 ? (
+          <div style={{padding: '30px', textAlign: 'center', color: 'var(--text-dim)', fontStyle: 'italic', background: 'rgba(0,0,0,0.2)', borderRadius: '6px'}}>
+            No se han registrado operaciones en esta sesión. Las órdenes disparadas o confirmadas aparecerán aquí.
+          </div>
+        ) : (
+          <div style={{overflowX: 'auto'}}>
+            <table style={{width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem'}}>
+              <thead>
+                <tr style={{borderBottom: '1px solid var(--border)', color: 'var(--text-dim)'}}>
+                  <th style={{padding: '10px'}}>Hora</th>
+                  <th style={{padding: '10px'}}>Símbolo</th>
+                  <th style={{padding: '10px'}}>Decisión</th>
+                  <th style={{padding: '10px'}}>Entrada</th>
+                  <th style={{padding: '10px'}}>Stop Loss</th>
+                  <th style={{padding: '10px'}}>Take Profit</th>
+                  <th style={{padding: '10px'}}>Ticket MT5</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeHistory.map((t, idx) => (
+                  <tr key={idx} style={{borderBottom: '1px solid rgba(255,255,255,0.05)'}}>
+                    <td style={{padding: '10px', color: 'var(--text-dim)'}}>{t.time}</td>
+                    <td style={{padding: '10px', fontWeight: 'bold'}}>{t.symbol}</td>
+                    <td style={{padding: '10px'}}>
+                      <span style={{padding: '3px 8px', borderRadius: '4px', background: t.decision === 'BUY' ? 'rgba(0, 255, 128, 0.1)' : 'rgba(255, 51, 102, 0.1)', color: t.decision === 'BUY' ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold'}}>
+                        {t.decision}
+                      </span>
+                    </td>
+                    <td style={{padding: '10px', fontFamily: 'monospace'}}>{t.entry_price}</td>
+                    <td style={{padding: '10px', fontFamily: 'monospace', color: 'var(--danger)'}}>{t.stop_loss}</td>
+                    <td style={{padding: '10px', fontFamily: 'monospace', color: 'var(--success)'}}>{t.take_profit}</td>
+                    <td style={{padding: '10px', fontFamily: 'monospace', color: 'var(--accent-primary)'}}>#{t.ticket}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 
@@ -460,6 +565,29 @@ function App() {
                     transition: 'all 0.3s'
                   }} />
                 </button>
+              </div>
+
+              <div style={{marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <span style={{fontSize: '0.75rem', color: 'var(--text-dim)'}}>LOTE (VOLUMEN):</span>
+                <input 
+                  type="number" 
+                  step="0.05" 
+                  min="0.01" 
+                  max="10"
+                  value={lotSize} 
+                  onChange={(e) => updateLotSize(e.target.value)}
+                  style={{
+                    width: '70px',
+                    padding: '3px 8px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    color: 'var(--accent-primary)',
+                    fontWeight: 'bold',
+                    textAlign: 'right',
+                    fontSize: '0.8rem'
+                  }}
+                />
               </div>
            </div>
 
