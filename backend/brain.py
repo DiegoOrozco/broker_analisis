@@ -81,11 +81,12 @@ class TradingBrain:
         3. Revisa el ángulo de Gann del último tick en relación a los anteriores para ver en qué fase de respiración está.
         4. Si no hay una convergencia clara con una zona KLRR o el mercado está ruidoso, tu decisión OBLIGATORIA es "WAIT" para proteger el capital.
 
-        ### REGLAS DE PROYECCIÓN INSTITUCIONAL (SL y TP AMPLIOS) ###
-        ¡PROHIBIDO DAR TAKE PROFITS O STOP LOSS RIDÍCULAMENTE PEQUEÑOS DE 5 O 10 PUNTOS! En los índices sintéticos de Bridge Markets (Fortune, BullX, FomoX), las rupturas de zonas KLRR y descargas de Wyckoff tienen recorridos profundos de alta volatilidad.
-        - Para operaciones de BUY o SELL, el Take Profit debe buscar el final de la estructura institucional de descarga (ej. +150 a +450 puntos de distancia desde el precio de entrada, apuntando al objetivo de Fibonacci 1.0 o 1.618 del manual).
-        - El Stop Loss debe estar resguardado detrás de la KLRR opuesta o base estructural (ej. -30 a -90 puntos, garantizando un ratio Riesgo:Beneficio institucional de al menos 1:3 a 1:5).
-        - En el campo "forecast" (Proyección Proactiva), describe con cifras y fundamentos técnicos del manual hacia dónde se dirigirá este recorrido completo de cientos de puntos.
+        ### REGLAS DE FRANCOTIRADOR (SNIPER ENTRY: SL TIGHT & TP AMPLIO) ###
+        ¡El usuario exige entradas de alta precisión milimétrica en el punto exacto de quiebre KLRR!
+        - STOP LOSS ESTRICTO (MÁXIMO 10 PUNTOS/PIPS): El Stop Loss DEBE estar posicionado a un máximo absoluto de 10 puntos de distancia del precio de entrada estimado (ej. si entras en BUY a 12000, el Stop Loss no puede ser menor a 11990; si es SELL a 12000, no mayor a 12010). Buscamos el punto exacto de inflexión donde el riesgo es mínimo.
+        - TAKE PROFIT AMPLIO INSTITUCIONAL: El Take Profit debe proyectar el recorrido completo del estallido o descarga de Wyckoff (+150 a +450 puntos de distancia desde el precio de entrada, apuntando a Fibonacci 1.0 o 1.618 del manual).
+        - Con esto garantizamos un ratio Riesgo:Beneficio espectacular de francotirador (1:15 a 1:45).
+        - En el campo "forecast" (Proyección Proactiva), describe con cifras y fundamentos técnicos del manual hacia dónde se dirigirá este estallido masivo de cientos de puntos y por qué el nivel actual permite un stop tan ceñido.
 
         Analiza la convergencia estructural y devuelve la decisión en el formato JSON exigido.
         """
