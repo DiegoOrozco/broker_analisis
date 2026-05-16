@@ -119,7 +119,11 @@ async def market_stream(websocket: WebSocket):
             # print(f"--- TICK ENVIADO: {tick['price']} ---")
             await asyncio.sleep(0.1)
     except Exception as e:
-        print(f"--- WS ERROR ({symbol}): {e} ---")
+        import traceback
+        error_msg = f"--- WS ERROR ({symbol}): {e} ---\n{traceback.format_exc()}"
+        print(error_msg)
+        with open("debug.log", "a") as f:
+            f.write(error_msg + "\n")
 
 if __name__ == "__main__":
     import uvicorn
