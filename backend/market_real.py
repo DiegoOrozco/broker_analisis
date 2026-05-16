@@ -187,32 +187,41 @@ class BridgeMarketData:
         log_debug(f"¡POSICIÓN {ticket} MODIFICADA EN MT5! SL: {sl}, TP: {tp}")
         return {"success": True, "ticket": ticket, "sl": sl, "tp": tp}
 
-    def close_trade(self, ticket):
+    def close_trade(self, ticket=None, symbol=None):
         if not self.connected:
             return {"success": False, "error": "Sin conexion a MT5"}
             
-        position = mt5.positions_get(ticket=ticket)
-        if not position or len(position) == 0:
-            return {"success": False, "error": f"Posicion con ticket {ticket} no encontrada en MT5"}
+        positions = None
+        if ticket:
+            positions = mt5.positions_get(ticket=int(ticket))
+        if not positions or len(positions) == 0:
+            if symbol:
+                positions = mt5.positions_get(symbol=symbol)
+                
+        if not positions or len(positions) == 0:
+            err_msg = f"Posicion activa no encontrada para {symbol or ticket} en MT5"
+            log_debug(err_msg)
+            return {"success": False, "error": err_msg}
             
-        pos = position[0]
-        symbol = pos.symbol
+        pos = positions[0]
+        pos_ticket = pos.ticket
+        target_symbol = pos.symbol
         volume = pos.volume
         pos_type = pos.type
         
-        tick = mt5.symbol_info_tick(symbol)
+        tick = mt5.symbol_info_tick(target_symbol)
         if not tick:
-            return {"success": False, "error": f"No se pudo obtener precio para {symbol}"}
+            return {"success": False, "error": f"No se pudo obtener precio para {target_symbol}"}
             
         action_type = mt5.ORDER_TYPE_SELL if pos_type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
         price = tick.bid if pos_type == mt5.ORDER_TYPE_BUY else tick.ask
         
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": symbol,
+            "symbol": target_symbol,
             "volume": float(volume),
             "type": action_type,
-            "position": ticket,
+            "position": pos_ticket,
             "price": price,
             "deviation": 20,
             "magic": 234000,
@@ -227,8 +236,8 @@ class BridgeMarketData:
             log_debug(error_msg)
             return {"success": False, "error": error_msg}
             
-        log_debug(f"¡POSICION {ticket} CERRADA EN MT5! Simbolo: {symbol}, Volumen: {volume}")
-        return {"success": True, "ticket": ticket, "closed_price": result.price}
+        log_debug(f"¡POSICION {pos_ticket} CERRADA EN MT5! Simbolo: {target_symbol}, Volumen: {volume}")
+        return {"success": True, "ticket": pos_ticket, "closed_price": result.price}
 
     def close(self):
         mt5.shutdown()

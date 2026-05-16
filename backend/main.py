@@ -92,7 +92,7 @@ async def close_manual_trade(payload: dict):
     ticket = payload.get("ticket")
     
     print(f"--- [CIERRE MANUAL] SOLICITADO DESDE EL DASHBOARD: Ticket #{ticket} en {symbol} ---")
-    close_result = market_provider.close_trade(ticket=ticket)
+    close_result = market_provider.close_trade(ticket=ticket, symbol=symbol)
     
     if close_result.get("success"):
         if symbol in locked_trades:
