@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [selectedSymbol, setSelectedSymbol] = useState('Fortune 100.')
+  const [selectedSymbol, setSelectedSymbol] = useState('Fortune100.')
   const [ticks, setTicks] = useState([])
   const [currentTick, setCurrentTick] = useState(null)
   const [logs, setLogs] = useState([])
@@ -168,7 +168,7 @@ function App() {
 
       <div className="card" style={{display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center'}}>
         <span style={{color: 'var(--text-dim)'}}>Símbolos sugeridos:</span>
-        {['Fortune 100.', 'Fortune 250.', 'FomoX 100.', 'BullX 400.', 'BearX 400.'].map(s => (
+        {['Fortune100.', 'Fortune250.', 'FomoX111.', 'BullX400.', 'BearX400.'].map(s => (
           <button 
             key={s}
             onClick={() => setSelectedSymbol(s)}
