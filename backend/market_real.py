@@ -73,6 +73,42 @@ class BridgeMarketData:
             log_debug(f"Error en tick {symbol}: {e}")
             return None
 
+    def preload_history(self, symbol, count=300):
+        if not self.connected:
+            if not self.connect():
+                return []
+        try:
+            mt5.symbol_select(symbol, True)
+            historical = mt5.copy_ticks_from_pos(symbol, 0, count, mt5.COPY_TICKS_ALL)
+            if historical is None or len(historical) == 0:
+                return []
+                
+            preloaded = []
+            if symbol not in self.tick_counts:
+                self.tick_counts[symbol] = 0
+                
+            for h in historical:
+                self.tick_counts[symbol] += 1
+                bid = float(h['bid'])
+                ask = float(h['ask'])
+                last = float(h['last'])
+                price = round(last if last > 0 else bid, 2)
+                if price <= 0:
+                    continue
+                e_draw = round(min(0.99, max(0.05, ((ask - bid) * 100) / bid if bid > 0 else 0.5)), 4)
+                preloaded.append({
+                    "tick": self.tick_counts[symbol],
+                    "angle": self.tick_counts[symbol] % 360,
+                    "price": price,
+                    "time": int(h['time']),
+                    "e_draw": e_draw
+                })
+            log_debug(f"Preloaded {len(preloaded)} ticks for {symbol}")
+            return preloaded
+        except Exception as e:
+            log_debug(f"Error preloading history for {symbol}: {e}")
+            return []
+
     def execute_trade(self, symbol, decision, lot_size, sl, tp):
         if not self.connected:
             return {"success": False, "error": "No conectado a MT5"}

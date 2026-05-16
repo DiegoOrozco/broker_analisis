@@ -205,7 +205,8 @@ async def market_stream(websocket: WebSocket):
     print(f"--- CONEXIÓN WS ACEPTADA PARA {symbol} ---")
     
     if symbol not in tick_histories:
-        tick_histories[symbol] = []
+        print(f"--- ⚡ PRECARGANDO HISTORIAL DE MT5 PARA {symbol} ---")
+        tick_histories[symbol] = market_provider.preload_history(symbol, MAX_HISTORY)
 
     try:
         while True:
@@ -262,7 +263,8 @@ async def background_scanner():
             monitored = CONFIG.get("monitored_symbols", [])
             for symbol in monitored:
                 if symbol not in tick_histories:
-                    tick_histories[symbol] = []
+                    print(f"--- ⚡ PRECARGANDO HISTORIAL DE MT5 PARA {symbol} ---")
+                    tick_histories[symbol] = market_provider.preload_history(symbol, MAX_HISTORY)
                     
                 tick = market_provider.get_next_tick(symbol)
                 if not tick:
