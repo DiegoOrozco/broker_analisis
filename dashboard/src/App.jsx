@@ -37,8 +37,10 @@ function App() {
   useEffect(() => {
     const connect = () => {
       // Re-connect when symbol changes
-      if (ws.current) ws.current.close()
-      
+      if (ws.current) {
+        ws.current.onclose = null
+        ws.current.close()
+      }
       ws.current = new WebSocket(`${WS_BASE}/ws/market?symbol=${encodeURIComponent(selectedSymbol)}`)
       
       ws.current.onopen = () => {
@@ -68,7 +70,12 @@ function App() {
     }
 
     connect()
-    return () => ws.current?.close()
+    return () => {
+      if (ws.current) {
+        ws.current.onclose = null
+        ws.current.close()
+      }
+    }
   }, [selectedSymbol])
 
   const addLog = (msg) => {
