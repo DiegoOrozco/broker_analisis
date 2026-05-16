@@ -124,47 +124,55 @@ class BridgeMarketData:
             return {"success": False, "error": f"Símbolo no encontrado: {symbol}"}
             
         point = symbol_info.point
-        tick = mt5.symbol_info_tick(symbol)
-        price = tick.ask if decision == "BUY" else tick.bid
-        
-        # Recalcular stops de seguridad garantizados respecto al precio real Ask/Bid para evitar retcode 10016
+        order_type = mt5.ORDER_TYPE_BUY if decision == "BUY" else mt5.ORDER_TYPE_SELL
         stop_dist = 25.0
         tp_dist = 50.0
-        if decision == "BUY":
-            safe_sl = round(price - stop_dist, 2)
-            safe_tp = round(price + tp_dist, 2)
-        else:
-            safe_sl = round(price + stop_dist, 2)
-            safe_tp = round(price - tp_dist, 2)
         
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": symbol,
-            "volume": float(lot_size),
-            "type": mt5.ORDER_TYPE_BUY if decision == "BUY" else mt5.ORDER_TYPE_SELL,
-            "price": price,
-            "sl": float(safe_sl),
-            "tp": float(safe_tp),
-            "deviation": 20,
-            "magic": 234000,
-            "comment": "Antigravity AI Sniper",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_FOK,
-        }
-        
-        result = mt5.order_send(request)
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            error_msg = f"Orden rechazada: {result.comment} (Code: {result.retcode})"
-            log_debug(error_msg)
-            return {"success": False, "error": error_msg}
+        last_err = "Error desconocido"
+        for attempt in range(4):
+            tick = mt5.symbol_info_tick(symbol)
+            if not tick:
+                continue
+            price = tick.ask if decision == "BUY" else tick.bid
+            if decision == "BUY":
+                safe_sl = round(price - stop_dist, 2)
+                safe_tp = round(price + tp_dist, 2)
+            else:
+                safe_sl = round(price + stop_dist, 2)
+                safe_tp = round(price - tp_dist, 2)
+                
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": float(lot_size),
+                "type": order_type,
+                "price": price,
+                "sl": float(safe_sl),
+                "tp": float(safe_tp),
+                "deviation": 300,
+                "magic": 234000,
+                "comment": f"Antigravity Sniper a{attempt+1}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_FOK,
+            }
             
-        log_debug(f"¡ORDEN EJECUTADA EN MT5! {decision} en {symbol} a {price}. Ticket: {result.order}")
-        return {
-            "success": True,
-            "ticket": result.order,
-            "price": result.price,
-            "volume": result.volume
-        }
+            result = mt5.order_send(request)
+            if result.retcode == mt5.TRADE_RETCODE_DONE:
+                log_debug(f"¡ORDEN EJECUTADA EN MT5 (Intento #{attempt+1})! {decision} en {symbol} a {price}. Ticket: {result.order}")
+                return {
+                    "success": True,
+                    "ticket": result.order,
+                    "price": result.price,
+                    "volume": result.volume
+                }
+                
+            last_err = f"{result.comment} (Code: {result.retcode})"
+            log_debug(f"--- Reintento #{attempt+1} disparo fallido: {last_err} ---")
+            time.sleep(0.25)
+            
+        error_msg = f"Orden rechazada tras 4 intentos: {last_err}"
+        log_debug(error_msg)
+        return {"success": False, "error": error_msg}
 
     def modify_trade(self, symbol, ticket, sl, tp):
         if not self.connected:
@@ -209,35 +217,42 @@ class BridgeMarketData:
         volume = pos.volume
         pos_type = pos.type
         
-        tick = mt5.symbol_info_tick(target_symbol)
-        if not tick:
-            return {"success": False, "error": f"No se pudo obtener precio para {target_symbol}"}
-            
         action_type = mt5.ORDER_TYPE_SELL if pos_type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
-        price = tick.bid if pos_type == mt5.ORDER_TYPE_BUY else tick.ask
         
-        request = {
-            "action": mt5.TRADE_ACTION_DEAL,
-            "symbol": target_symbol,
-            "volume": float(volume),
-            "type": action_type,
-            "position": pos_ticket,
-            "price": price,
-            "deviation": 20,
-            "magic": 234000,
-            "comment": "Antigravity AI Close",
-            "type_time": mt5.ORDER_TIME_GTC,
-            "type_filling": mt5.ORDER_FILLING_FOK,
-        }
-        
-        result = mt5.order_send(request)
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            error_msg = f"Cierre rechazado: {result.comment} (Code: {result.retcode})"
-            log_debug(error_msg)
-            return {"success": False, "error": error_msg}
+        last_err = "Error desconocido"
+        for attempt in range(4):
+            tick = mt5.symbol_info_tick(target_symbol)
+            if not tick:
+                continue
+                
+            price = tick.bid if pos_type == mt5.ORDER_TYPE_BUY else tick.ask
             
-        log_debug(f"¡POSICION {pos_ticket} CERRADA EN MT5! Simbolo: {target_symbol}, Volumen: {volume}")
-        return {"success": True, "ticket": pos_ticket, "closed_price": result.price}
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": target_symbol,
+                "volume": float(volume),
+                "type": action_type,
+                "position": int(pos_ticket),
+                "price": price,
+                "deviation": 300,
+                "magic": 234000,
+                "comment": f"Antigravity Close a{attempt+1}",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_FOK,
+            }
+            
+            result = mt5.order_send(request)
+            if result.retcode == mt5.TRADE_RETCODE_DONE:
+                log_debug(f"¡POSICION {pos_ticket} CERRADA EN MT5 (Intento #{attempt+1})! Simbolo: {target_symbol}, Volumen: {volume}")
+                return {"success": True, "ticket": pos_ticket, "closed_price": result.price}
+                
+            last_err = f"{result.comment} (Code: {result.retcode})"
+            log_debug(f"--- Reintento #{attempt+1} de cierre fallido: {last_err} ---")
+            time.sleep(0.25)
+            
+        error_msg = f"Cierre rechazado tras 4 intentos: {last_err}"
+        log_debug(error_msg)
+        return {"success": False, "error": error_msg}
 
     def close(self):
         mt5.shutdown()
