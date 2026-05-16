@@ -90,22 +90,30 @@ function App() {
 
   const lockCurrentTrade = () => {
     if (!lastSignal || lastSignal.decision === 'WAIT') return
-    const tradeData = {
+    const tradePayload = {
+      symbol: selectedSymbol,
       decision: lastSignal.decision,
-      entry_price: lastSignal.entry_price,
       stop_loss: lastSignal.stop_loss,
-      take_profit: lastSignal.take_profit,
-      symbol: selectedSymbol
+      take_profit: lastSignal.take_profit
     }
-    fetch(`${API_BASE}/lock_trade`, {
+    fetch(`${API_BASE}/execute_manual_trade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol: selectedSymbol, trade: tradeData })
+      body: JSON.stringify(tradePayload)
     }).then(res => res.json())
       .then(data => {
-        setLockedTrade(data.locked_trade)
-        addLog(`🔒 ENTRADA FIJADA: ${tradeData.decision} en ${tradeData.entry_price} (SL: ${tradeData.stop_loss}, TP: ${tradeData.take_profit})`)
-      }).catch(err => console.error("Error locking trade:", err))
+        if (data.success) {
+          setLockedTrade(data.locked_trade)
+          playAudioAlert('EXECUTE')
+          addLog(`🚀 DISPARO EN DIRECTO MT5: ${tradePayload.decision} exitoso. Ticket #${data.locked_trade.ticket}`)
+        } else {
+          addLog(`⚠️ ERROR DISPARO MT5: ${data.error}`)
+          alert(`No se pudo ejecutar la orden en MT5: ${data.error}`)
+        }
+      }).catch(err => {
+        console.error("Error executing trade:", err)
+        addLog(`⚠️ ERROR DE RED AL DISPARAR: ${err.message}`)
+      })
   }
 
   const unlockTrade = () => {
@@ -398,13 +406,13 @@ function App() {
              lastSignal && lastSignal.decision !== 'WAIT' && (
                <div style={{marginTop: '25px', padding: '16px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px'}}>
                  <div style={{color: 'var(--text-main)', fontSize: '0.95rem'}}>
-                   ¿Entraste a esta señal en tu MT5? Fija el precio para seguimiento algorítmico en vivo:
+                   ¿Quieres ejecutar esta oportunidad de Francotirador en tu terminal MT5 al instante?
                  </div>
                  <button 
                    onClick={lockCurrentTrade}
-                   style={{background: 'var(--success)', color: 'white', border: 'none', padding: '10px 22px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', boxShadow: '0 0 15px rgba(38, 166, 154, 0.4)'}}
+                   style={{background: 'var(--success)', color: 'white', border: 'none', padding: '10px 22px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', boxShadow: '0 0 15px rgba(38, 166, 154, 0.6)'}}
                  >
-                   ✅ Confirmar Entrada en {lastSignal.entry_price}
+                   🚀 DISPARAR ORDEN EN VIVO ({lastSignal.decision})
                  </button>
                </div>
              )

@@ -55,6 +55,37 @@ async def update_locked_trade(payload: dict):
     print(f"--- POSICIÓN FIJADA PARA {symbol}: {trade} ---")
     return {"status": "ok", "locked_trade": trade}
 
+@app.post("/execute_manual_trade")
+async def execute_manual_trade(payload: dict):
+    symbol = payload.get("symbol")
+    decision = payload.get("decision")
+    sl = payload.get("stop_loss", 0)
+    tp = payload.get("take_profit", 0)
+    lot_size = CONFIG.get("lot_size", 0.20)
+    
+    print(f"--- 🚀 DISPARO MANUAL SOLICITADO DESDE EL DASHBOARD: {decision} en {symbol} ---")
+    trade_result = market_provider.execute_trade(
+        symbol=symbol,
+        decision=decision,
+        lot_size=lot_size,
+        sl=sl,
+        tp=tp
+    )
+    
+    if trade_result.get("success"):
+        locked_trades[symbol] = {
+            "decision": decision,
+            "entry_price": trade_result["price"],
+            "stop_loss": sl,
+            "take_profit": tp,
+            "ticket": trade_result["ticket"]
+        }
+        print(f"--- ✅ DISPARO EXITOSO (Ticket #{trade_result['ticket']}). POSICIÓN FIJADA. ---")
+        return {"success": True, "locked_trade": locked_trades[symbol]}
+    else:
+        print(f"--- ⚠️ ERROR DISPARANDO ORDEN: {trade_result.get('error')} ---")
+        return {"success": False, "error": trade_result.get("error")}
+
 # Global state for signals
 last_signals = {}
 # Global state for tick history per symbol
@@ -168,7 +199,7 @@ def check_trailing_stop(symbol, cur_price):
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
-    symbol = websocket.query_params.get("symbol", "Fortune 100.")
+    symbol = websocket.query_params.get("symbol", "Fortune100.")
     print(f"--- NUEVO INTENTO DE CONEXIÓN WS: {symbol} ---")
     await websocket.accept()
     print(f"--- CONEXIÓN WS ACEPTADA PARA {symbol} ---")
