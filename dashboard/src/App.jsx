@@ -469,7 +469,7 @@ function App() {
                 Selecciona los índices que la IA monitoreará en segundo plano, sin importar cuál estés viendo en pantalla.
               </p>
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                {['Fortune100', 'Fortune250', 'BullX400', 'BearX400', 'VorteX75', 'FomoX111'].map(sym => (
+                {['Fortune100.', 'Fortune250.', 'BullX400.', 'BearX400.', 'VorteX75.', 'FomoX111.'].map(sym => (
                   <label key={sym} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: monitoredSymbols.includes(sym) ? 'var(--accent-primary)' : 'var(--text-main)'}}>
                     <input 
                       type="checkbox" 
