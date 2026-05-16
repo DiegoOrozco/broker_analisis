@@ -69,17 +69,14 @@ class TradingBrain:
         locked_context = ""
         if locked_trade:
             locked_context = f"""
-        ### OPERACIÓN BLOQUEADA / FIJADA POR EL USUARIO EN CURSO ###
-        - ATENCIÓN: El usuario TIENE UNA POSICIÓN REAL ACTIVA en {locked_trade.get('decision')} a un precio de entrada de {locked_trade.get('entry_price')}.
-        - Stop Loss fijado por el usuario: {locked_trade.get('stop_loss')}
-        - Take Profit fijado por el usuario: {locked_trade.get('take_profit')}
+        ### POSICIÓN REAL ACTIVA EN CURSO ({locked_trade.get('decision')} en {symbol}) ###
+        - Precio de entrada: {locked_trade.get('entry_price')}
+        - SL actual: {locked_trade.get('stop_loss')} / TP actual: {locked_trade.get('take_profit')}
         
-        MISIÓN DE GESTIÓN:
-        - Como el usuario ya entró, tu tarea no es darle una nueva señal desde cero, sino GESTIONAR LA POSICIÓN ACTUAL.
-        - Evalúa si el precio actual sigue respetando el Stop Loss y si el momentum se dirige al Take Profit.
-        - Si el trade va bien, mantén la decisión ("BUY" o "SELL") y en "reason" y "forecast" explica el progreso del trade hacia el Take Profit.
-        - Mantén ESTRICTAMENTE los mismos entry_price, stop_loss y take_profit de la posición fijada en el JSON de salida.
-        - Si detectas que el quiebre falló y la estructura se colapsa con violencia en contra, cambia decision a "EXIT" o "SALIR" para recomendar el cierre manual de emergencia.
+        MISIÓN CRÍTICA DE GESTIÓN Y PROTECCIÓN DE GANANCIAS (KLRR & WYCKOFF):
+        - Tu tarea EXCLUSIVA es monitorear esta operación activa.
+        - REGLA DE PROTECCIÓN DE BENEFICIOS (ES MEJOR $50 EN BOLSILLO QUE $0 POR ESPERAR): Si la operación se encuentra con ganancias notables (ej. +20, +40 o +50 puntos o dólares a favor) y observas en el flujo de ticks que la vela está perdiendo impulso, formando una divergencia KLRR, o entrando en zona de agotamiento/distribución Wyckoff, tu decisión OBLIGATORIA debe ser "EXIT" o "SALIR". Esto le ordenará al servidor cerrar la orden a mercado de inmediato y embolsar los dólares de ganancia real en la cuenta.
+        - Si la tendencia sigue con fuerza arrolladora hacia el Take Profit sin signos de agotamiento, devuelve la misma decisión ("BUY" o "SELL") para dejarla correr.
         """
 
         prompt = f"""

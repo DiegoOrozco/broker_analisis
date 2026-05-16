@@ -139,7 +139,21 @@ async def run_ai_analysis_global(symbol, history):
             "confidence_score": ai_res.get("confidence_score", 0.5) if ai_res else 0.5
         }
     else:
-        if locked:
+        active_positions = market_provider.get_open_positions(symbol)
+        if active_positions and ai_res.get("decision") in ["EXIT", "SALIR", "CLOSE"]:
+            print(f"--- [AI PROTECTOR] GEMINI ORDENA CIERRE INTELIGENTE DE GANANCIAS EN {symbol} ---")
+            closed_count = 0
+            for pos in active_positions:
+                if pos["profit"] > 0:  # Priorizar el cierre de operaciones en verde
+                    close_res = market_provider.close_trade(ticket=pos["ticket"], symbol=symbol)
+                    if close_res.get("success"):
+                        closed_count += 1
+            if closed_count > 0:
+                if symbol in locked_trades:
+                    del locked_trades[symbol]
+                ai_res["decision"] = "WAIT"
+                ai_res["reason"] = f"🌟 [CIERRE INTELIGENTE KLRR] Operación cerrada en el pico para asegurar ganancias netas en cuenta. {ai_res.get('reason', '')}"
+        elif locked:
             ai_res["decision"] = locked["decision"]
             ai_res["entry_price"] = locked["entry_price"]
             ai_res["stop_loss"] = locked["stop_loss"]
@@ -188,7 +202,7 @@ async def run_ai_analysis_global(symbol, history):
     print(f"--- NUEVA SENAL PARA {symbol}: {ai_res['decision']} ---")
 
 def check_trailing_stop(symbol, cur_price=None):
-    """ Escanea las posiciones reales abiertas en MT5 para ese símbolo y ajusta Breakeven y Trailing Stop """
+    """ Escanea las posiciones reales abiertas en MT5 para ese símbolo y ajusta Breakeven y Trailing Stop en ganancias """
     positions = market_provider.get_open_positions(symbol)
     if not positions:
         return
@@ -200,31 +214,48 @@ def check_trailing_stop(symbol, cur_price=None):
         current = float(pos["current_price"])
         sl = float(pos["sl"])
         tp = float(pos["tp"])
+        profit = float(pos["profit"])
         
         if pos_type == "BUY":
-            # Si el precio ha subido al menos 5 puntos desde la entrada
-            if current >= entry + 5.0:
-                # Breakeven asegura +0.5 pt; el trailing avanza persiguiendo a 4.5 pt
+            # Trailing Stop Escalonado Inteligente en Ganancias
+            if current >= entry + 30.0 or profit >= 30.0:
+                # Si estamos con grandes ganancias (+$30 USD o +30 pts), aseguramos el 75% del recorrido
+                target_sl = round(current - 10.0, 2)
+                if target_sl > sl:
+                    res = market_provider.modify_trade(symbol, ticket, target_sl, tp)
+                    if res.get("success"):
+                        if symbol in locked_trades:
+                            locked_trades[symbol]["stop_loss"] = target_sl
+                        print(f"[PROFIT PROTECTOR] BUY #{ticket} ({symbol}) +${profit}: SL ajustado a {target_sl} para blindar ganancia")
+            elif current >= entry + 5.0 or profit >= 5.0:
+                # Breakeven inicial
                 target_sl = round(max(entry + 0.5, current - 4.5), 2)
-                # Modificamos si el SL anterior estaba en negativo o si el nuevo SL avanza al menos 0.5 pt
                 if sl < entry or target_sl >= sl + 0.5:
                     res = market_provider.modify_trade(symbol, ticket, target_sl, tp)
                     if res.get("success"):
                         if symbol in locked_trades:
                             locked_trades[symbol]["stop_loss"] = target_sl
-                        print(f"[BREAKEVEN / TRAILING] BUY #{ticket} ({symbol}): SL movido de {sl} -> {target_sl}")
+                        print(f"[BREAKEVEN] BUY #{ticket} ({symbol}): SL movido a {target_sl}")
         elif pos_type == "SELL":
-            # Si el precio ha bajado al menos 5 puntos desde la entrada
-            if current <= entry - 5.0:
-                # Breakeven asegura -0.5 pt; el trailing avanza persiguiendo a 4.5 pt
+            # Trailing Stop Escalonado Inteligente en Ganancias
+            if current <= entry - 30.0 or profit >= 30.0:
+                # Si estamos con grandes ganancias (+$30 USD o +30 pts), aseguramos el 75% del recorrido
+                target_sl = round(current + 10.0, 2)
+                if sl == 0 or target_sl < sl:
+                    res = market_provider.modify_trade(symbol, ticket, target_sl, tp)
+                    if res.get("success"):
+                        if symbol in locked_trades:
+                            locked_trades[symbol]["stop_loss"] = target_sl
+                        print(f"[PROFIT PROTECTOR] SELL #{ticket} ({symbol}) +${profit}: SL ajustado a {target_sl} para blindar ganancia")
+            elif current <= entry - 5.0 or profit >= 5.0:
+                # Breakeven inicial
                 target_sl = round(min(entry - 0.5, current + 4.5), 2)
-                # Modificamos si el SL anterior estaba en negativo o si el nuevo SL avanza al menos 0.5 pt
                 if sl == 0 or sl > entry or target_sl <= sl - 0.5:
                     res = market_provider.modify_trade(symbol, ticket, target_sl, tp)
                     if res.get("success"):
                         if symbol in locked_trades:
                             locked_trades[symbol]["stop_loss"] = target_sl
-                        print(f"[BREAKEVEN / TRAILING] SELL #{ticket} ({symbol}): SL movido de {sl} -> {target_sl}")
+                        print(f"[BREAKEVEN] SELL #{ticket} ({symbol}): SL movido a {target_sl}")
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
