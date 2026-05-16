@@ -223,6 +223,13 @@ function App() {
               {lastSignal?.reason || 'El sistema está monitoreando los ciclos de Gann y niveles Wyckoff para identificar el próximo KLRR.'}
            </p>
 
+           {lastSignal?.forecast && (
+             <div style={{marginTop: '15px', padding: '15px', background: 'rgba(0, 191, 255, 0.1)', borderLeft: '3px solid #00bfff', borderRadius: '4px'}}>
+               <strong style={{color: '#00bfff', display: 'block', marginBottom: '5px'}}>🔮 Proyección Proactiva:</strong>
+               <span style={{color: 'var(--text-main)', fontSize: '0.95rem', lineHeight: '1.4'}}>{lastSignal.forecast}</span>
+             </div>
+           )}
+
            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginTop: '30px', borderTop: '1px solid var(--border)', paddingTop: '20px'}}>
               <div>
                 <span style={{color: 'var(--text-dim)', fontSize: '0.8rem'}}>PUNTO DE ENTRADA</span>

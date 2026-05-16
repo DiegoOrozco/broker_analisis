@@ -71,6 +71,7 @@ async def market_stream(websocket: WebSocket):
                 "type": ai_res.get("type") if ai_res else "Espera / Rango",
                 "is_continuation": False,
                 "reason": ai_res.get("reason") if ai_res else "Sin convergencia clara de KLRR / Gann. Esperando setup de alta convicción.",
+                "forecast": ai_res.get("forecast") if ai_res else "A la espera de ruptura estructural o patrón claro del manual para proyectar el siguiente impulso.",
                 "entry_price": last_price,
                 "stop_loss": 0,
                 "take_profit": 0,

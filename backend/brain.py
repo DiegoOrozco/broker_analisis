@@ -47,6 +47,7 @@ class TradingBrain:
           "type": "Breakout" | "Continuación" | "Scalping" | "Reversión" | "Espera",
           "is_continuation": true | false,
           "reason": "Explicación súper precisa, citando el manual, de por qué se toma esta decisión basado en Gann/KLRR/E-Draw actual",
+          "forecast": "Pronóstico proactivo: Basado en las características de ESTE índice específico en el manual que acabas de leer, ¿qué movimiento fuerte se está gestando y hacia dónde nos vamos a montar a corto/mediano plazo?",
           "entry_price": float (precio actual estimado),
           "stop_loss": float (calculado por ti),
           "take_profit": float (calculado por ti),
