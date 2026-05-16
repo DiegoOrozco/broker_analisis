@@ -177,6 +177,48 @@ async def run_ai_analysis_global(symbol, history):
             print(f"Error calling Gemini: {e}")
             ai_res = None
             
+    # 🛡️ INTERCEPTOR ANTI-TRAMPA (CRÍTICO PARA BULLX Y BEARX) 🛡️
+    # Evitar que la IA compre en la cima o venda en el fondo guiada por emociones falsas de momentum
+    if ai_res and ai_res.get("decision") in ["BUY", "PENDING_BUY", "SELL", "PENDING_SELL", "EXIT", "CLOSE"]:
+        if len(history) >= 10:
+            recent_10 = history[-10:]
+            current_price = recent_10[-1]["price"]
+            max_10 = max(t["price"] for t in recent_10)
+            min_10 = min(t["price"] for t in recent_10)
+            
+            if "Bull" in symbol:
+                # Si la IA quiere comprar, pero el precio está en la cima del spike, BLOQUEAR
+                if ai_res.get("decision") in ["BUY", "PENDING_BUY"] and (max_10 - current_price) < 1.0:
+                    # Revisar si hubo un spike masivo
+                    for i in range(1, len(recent_10)):
+                        if recent_10[i]["price"] - recent_10[i-1]["price"] > 2.0:
+                            ai_res["decision"] = "WAIT"
+                            ai_res["reason"] = "🛡️ [SISTEMA ANTI-TRAMPA] IA intentó comprar en la cima del Spike en BullX. Operación suicida bloqueada por el Búnker."
+                            print(f"--- 🛑 [BLOQUEO] IA intentó comprar en la cima de {symbol} ---")
+                            break
+                            
+                # Si la IA quiere cerrar/salir por pánico justo en el fondo antes del próximo spike
+                elif ai_res.get("decision") in ["EXIT", "CLOSE"] and (current_price - min_10) < 1.0:
+                    ai_res["decision"] = "WAIT"
+                    ai_res["reason"] = "🛡️ [SISTEMA ANTI-TRAMPA] IA intentó cerrar por pánico en el fondo de BullX. Bloqueado para esperar el Spike."
+                    print(f"--- 🛑 [BLOQUEO] IA intentó cerrar en el fondo de {symbol} ---")
+
+            elif "Bear" in symbol:
+                # Si la IA quiere vender, pero el precio está en el fondo del spike
+                if ai_res.get("decision") in ["SELL", "PENDING_SELL"] and (current_price - min_10) < 1.0:
+                    for i in range(1, len(recent_10)):
+                        if recent_10[i]["price"] - recent_10[i-1]["price"] < -2.0:
+                            ai_res["decision"] = "WAIT"
+                            ai_res["reason"] = "🛡️ [SISTEMA ANTI-TRAMPA] IA intentó vender en el fondo del Spike en BearX. Operación suicida bloqueada."
+                            print(f"--- 🛑 [BLOQUEO] IA intentó vender en el fondo de {symbol} ---")
+                            break
+                            
+                # Si la IA quiere cerrar/salir por pánico justo en la cima antes del próximo spike
+                elif ai_res.get("decision") in ["EXIT", "CLOSE"] and (max_10 - current_price) < 1.0:
+                    ai_res["decision"] = "WAIT"
+                    ai_res["reason"] = "🛡️ [SISTEMA ANTI-TRAMPA] IA intentó cerrar por pánico en la cima de BearX. Bloqueado para esperar el Spike."
+                    print(f"--- 🛑 [BLOQUEO] IA intentó cerrar en la cima de {symbol} ---")
+
     # Fallback o formateo si la decisión es WAIT o falló
     if not ai_res or ai_res.get("decision") == "WAIT":
         # 🛡️ INYECCIÓN DEL SPIKE HUNTER 🛡️
