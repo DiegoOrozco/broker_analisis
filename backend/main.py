@@ -165,7 +165,7 @@ async def market_stream(websocket: WebSocket):
             if len(tick_histories[symbol]) > MAX_HISTORY:
                 tick_histories[symbol].pop(0)
             
-            if tick["tick"] == 1 or tick["tick"] % 50 == 0:
+            if tick["tick"] == 1 or tick["tick"] % 300 == 0:
                 if symbol not in last_signals:
                     last_signals[symbol] = {
                         "decision": "ANALIZANDO",
@@ -212,8 +212,8 @@ async def background_scanner():
                 if len(tick_histories[symbol]) > MAX_HISTORY:
                     tick_histories[symbol].pop(0)
                 
-                # Ejecutar análisis IA cada 50 iteraciones para este símbolo
-                if iteration % 50 == 0:
+                # Ejecutar análisis IA cada 300 iteraciones (~1 minuto) para ahorrar costos de Gemini
+                if iteration % 300 == 0:
                     asyncio.create_task(run_ai_analysis_global(symbol, list(tick_histories[symbol])))
                     
             iteration += 1
