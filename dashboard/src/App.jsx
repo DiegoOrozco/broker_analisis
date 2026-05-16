@@ -35,6 +35,12 @@ function App() {
   }
 
   useEffect(() => {
+    // Limpiar estado al cambiar de índice
+    setTicks([])
+    setCurrentTick(null)
+    setLogs([])
+    setLastSignal(null)
+
     const connect = () => {
       // Re-connect when symbol changes
       if (ws.current) {
@@ -60,6 +66,8 @@ function App() {
             setLastSignal(payload.ai_signal)
             addLog(`NUEVA SEÑAL: ${payload.ai_signal.decision} - ${payload.ai_signal.reason}`)
           }
+        } else if (payload.type === 'ERROR') {
+          addLog(`ERROR MT5: ${payload.message}`)
         }
       }
       
@@ -146,21 +154,21 @@ function App() {
       <header style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
         <h1>KLRR Analyzer <span style={{fontSize: '1rem', color: 'var(--text-dim)'}}>Señales de Entrada/Salida</span></h1>
         <div style={{
-          background: 'rgba(255, 193, 7, 0.1)',
-          color: '#ffc107',
+          background: 'rgba(0, 255, 128, 0.1)',
+          color: 'var(--success)',
           padding: '5px 12px',
           borderRadius: '20px',
           fontSize: '0.75rem',
-          border: '1px solid #ffc107',
+          border: '1px solid var(--success)',
           fontWeight: 'bold'
         }}>
-          ⚠️ MODO LABORATORIO (SIMULADO)
+          REAL-TIME (MT5 BRIDGE MARKETS)
         </div>
       </header>
 
       <div className="card" style={{display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center'}}>
         <span style={{color: 'var(--text-dim)'}}>Símbolos sugeridos:</span>
-        {['Fortune 100.', 'Fortune 250.', 'Fortune 1000.', 'FortuneX200.', 'Volatility 75 Index'].map(s => (
+        {['Fortune 100.', 'Fortune 250.', 'FomoX 100.', 'BullX 400.', 'BearX 400.'].map(s => (
           <button 
             key={s}
             onClick={() => setSelectedSymbol(s)}
