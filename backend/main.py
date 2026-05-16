@@ -187,32 +187,44 @@ async def run_ai_analysis_global(symbol, history):
     last_signals[symbol] = ai_res
     print(f"--- NUEVA SENAL PARA {symbol}: {ai_res['decision']} ---")
 
-def check_trailing_stop(symbol, cur_price):
-    """ Mueve el Stop Loss a Breakeven y lo persigue (Trailing Stop) en MT5 """
-    if symbol in locked_trades and "ticket" in locked_trades[symbol]:
-        trade = locked_trades[symbol]
-        decision = trade["decision"]
-        entry = float(trade["entry_price"])
-        sl = float(trade["stop_loss"])
-        tp = float(trade["take_profit"])
-        ticket = trade["ticket"]
+def check_trailing_stop(symbol, cur_price=None):
+    """ Escanea las posiciones reales abiertas en MT5 para ese símbolo y ajusta Breakeven y Trailing Stop """
+    positions = market_provider.get_open_positions(symbol)
+    if not positions:
+        return
         
-        if decision == "BUY":
-            if cur_price >= entry + 5.0:
-                new_sl = round(max(sl, entry + 0.5, cur_price - 4.5), 2)
-                if new_sl > sl:
-                    res = market_provider.modify_trade(symbol, ticket, new_sl, tp)
+    for pos in positions:
+        ticket = pos["ticket"]
+        pos_type = pos["type"]
+        entry = float(pos["open_price"])
+        current = float(pos["current_price"])
+        sl = float(pos["sl"])
+        tp = float(pos["tp"])
+        
+        if pos_type == "BUY":
+            # Si el precio ha subido al menos 5 puntos desde la entrada
+            if current >= entry + 5.0:
+                # Breakeven asegura +0.5 pt; el trailing avanza persiguiendo a 4.5 pt
+                target_sl = round(max(entry + 0.5, current - 4.5), 2)
+                # Modificamos si el SL anterior estaba en negativo o si el nuevo SL avanza al menos 0.5 pt
+                if sl < entry or target_sl >= sl + 0.5:
+                    res = market_provider.modify_trade(symbol, ticket, target_sl, tp)
                     if res.get("success"):
-                        locked_trades[symbol]["stop_loss"] = new_sl
-                        print(f"[TRAILING] TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
-        elif decision == "SELL":
-            if cur_price <= entry - 5.0:
-                new_sl = round(min(sl if sl > 0 else entry + 10, entry - 0.5, cur_price + 4.5), 2)
-                if new_sl < sl or sl == 0:
-                    res = market_provider.modify_trade(symbol, ticket, new_sl, tp)
+                        if symbol in locked_trades:
+                            locked_trades[symbol]["stop_loss"] = target_sl
+                        print(f"[BREAKEVEN / TRAILING] BUY #{ticket} ({symbol}): SL movido de {sl} -> {target_sl}")
+        elif pos_type == "SELL":
+            # Si el precio ha bajado al menos 5 puntos desde la entrada
+            if current <= entry - 5.0:
+                # Breakeven asegura -0.5 pt; el trailing avanza persiguiendo a 4.5 pt
+                target_sl = round(min(entry - 0.5, current + 4.5), 2)
+                # Modificamos si el SL anterior estaba en negativo o si el nuevo SL avanza al menos 0.5 pt
+                if sl == 0 or sl > entry or target_sl <= sl - 0.5:
+                    res = market_provider.modify_trade(symbol, ticket, target_sl, tp)
                     if res.get("success"):
-                        locked_trades[symbol]["stop_loss"] = new_sl
-                        print(f"[TRAILING] TRAILING STOP AJUSTADO EN MT5 ({symbol}): {sl} -> {new_sl}")
+                        if symbol in locked_trades:
+                            locked_trades[symbol]["stop_loss"] = target_sl
+                        print(f"[BREAKEVEN / TRAILING] SELL #{ticket} ({symbol}): SL movido de {sl} -> {target_sl}")
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
