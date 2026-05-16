@@ -1,7 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react'
 
+const INDICES_CATEGORIES = {
+  "🌟 Fortune Indices": [
+    { symbol: "Fortune100.", desc: "50% Up or down with fixed step size of 0.1" },
+    { symbol: "Fortune250.", desc: "50% Up or down with fixed step size of 0.25" },
+    { symbol: "Fortune500.", desc: "50% Up or down with fixed step size of 0.5" },
+    { symbol: "Fortune1000.", desc: "50% Up or down with fixed step size of 1" },
+    { symbol: "FortuneX200.", desc: "50% Up/down with random step multiplier up to 200" },
+    { symbol: "FortuneX300.", desc: "50% Up/down with random step multiplier up to 300" },
+    { symbol: "FortuneX500.", desc: "50% Up/down with random step multiplier up to 500" }
+  ],
+  "🔥 Fomo Indices": [
+    { symbol: "FomoX111.", desc: "Haunt or be haunted, up/down spikes" },
+    { symbol: "FomoX333.", desc: "Haunt or be haunted, up/down spikes" },
+    { symbol: "FomoX555.", desc: "Haunt or be haunted, up/down spikes" },
+    { symbol: "FomoX888.", desc: "Haunt or be haunted, up/down spikes" },
+    { symbol: "FomoX999.", desc: "Haunt or be haunted, up/down spikes" },
+    { symbol: "FomoXpeed100.", desc: "Haunt or be haunted, 4x volatility" }
+  ],
+  "🌀 VorteX Indices": [
+    { symbol: "VorteX20.", desc: "2 Ticks per second, Fixed volatility of 20%" },
+    { symbol: "VorteX40.", desc: "4 Ticks per second, Fixed volatility of 40%" },
+    { symbol: "VorteX60.", desc: "4 Ticks per second, Fixed volatility of 60%" },
+    { symbol: "VorteX80.", desc: "4 Ticks per second, Fixed volatility of 80%" },
+    { symbol: "VorteX100.", desc: "4 Ticks per second, Fixed volatility of 100%" }
+  ],
+  "📈 BullX Indices": [
+    { symbol: "BullX400.", desc: "Up to 100 points higher. Feel the fury." },
+    { symbol: "BullX500.", desc: "Up to 300 points higher. Feel the fury." },
+    { symbol: "BullX777.", desc: "Up to 150 points higher. Feel the fury." },
+    { symbol: "BullX900.", desc: "Up to 180 points higher. Feel the fury." },
+    { symbol: "BullX1000.", desc: "Up to 250 points higher. Feel the fury." }
+  ],
+  "📉 BearX Indices": [
+    { symbol: "BearX400.", desc: "Up to 100 points crashes. Face the collapse." },
+    { symbol: "BearX500.", desc: "Up to 300 points crashes. Face the collapse." },
+    { symbol: "BearX777.", desc: "Up to 150 points crashes. Face the collapse." },
+    { symbol: "BearX900.", desc: "Up to 180 points crashes. Face the collapse." },
+    { symbol: "BearX1000.", desc: "Up to 250 points crashes. Face the collapse." }
+  ],
+  "⚡ Xpeed & Exotics": [
+    { symbol: "Xpeed100.", desc: "High velocity momentum index" },
+    { symbol: "Exotic100.", desc: "Exotic synthetic price action" }
+  ]
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeCategory, setActiveCategory] = useState("🌟 Fortune Indices")
   const [selectedSymbol, setSelectedSymbol] = useState('Fortune100.')
   const [ticks, setTicks] = useState([])
   const [currentTick, setCurrentTick] = useState(null)
@@ -370,42 +416,81 @@ function App() {
         </div>
       </header>
 
-      <div className="card" style={{display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center'}}>
-        <span style={{color: 'var(--text-dim)'}}>Símbolos sugeridos:</span>
-        {['Fortune100.', 'Fortune250.', 'FomoX111.', 'BullX400.', 'BearX400.'].map(s => (
-          <button 
-            key={s}
-            onClick={() => setSelectedSymbol(s)}
-            style={{
-              padding: '8px 15px',
-              background: selectedSymbol === s ? 'var(--accent-primary)' : 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              borderRadius: '6px',
-              color: selectedSymbol === s ? 'black' : 'white',
-              cursor: 'pointer',
-              fontSize: '0.85rem'
-            }}
-          >
-            {s}
-          </button>
-        ))}
-        <div style={{display: 'flex', gap: '10px', marginLeft: 'auto', alignItems: 'center'}}>
-           <span style={{color: 'var(--text-dim)', fontSize: '0.8rem'}}>OTRO:</span>
-           <input 
-             type="text" 
-             placeholder="Ej: BullX400"
-             onKeyDown={(e) => {
-               if (e.key === 'Enter') setSelectedSymbol(e.target.value)
-             }}
-             style={{
-               background: 'var(--bg-dark)',
-               border: '1px solid var(--border)',
-               borderRadius: '6px',
-               color: 'white',
-               padding: '8px',
-               width: '120px'
-             }}
-           />
+      <div className="card" style={{display: 'flex', flexDirection: 'column', gap: '15px'}}>
+        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'}}>
+          <span style={{color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 'bold'}}>CATEGORÍA DE ÍNDICES:</span>
+          <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+            {Object.keys(INDICES_CATEGORIES).map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  background: activeCategory === cat ? 'var(--accent-primary)' : 'rgba(255, 255, 255, 0.05)',
+                  color: activeCategory === cat ? 'black' : 'var(--text-dim)',
+                  border: activeCategory === cat ? 'none' : '1px solid var(--border)',
+                  transition: 'all 0.2s',
+                  boxShadow: activeCategory === cat ? '0 0 10px rgba(0, 255, 128, 0.3)' : 'none'
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+            <span style={{color: 'var(--text-dim)', fontSize: '0.8rem'}}>Búsqueda:</span>
+            <input 
+              type="text" 
+              placeholder="Ej: BullX400."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setSelectedSymbol(e.target.value.trim())
+              }}
+              style={{
+                background: 'var(--bg-dark)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                color: 'white',
+                padding: '6px 12px',
+                width: '130px',
+                fontSize: '0.85rem'
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', paddingTop: '5px', borderTop: '1px solid rgba(255, 255, 255, 0.05)'}}>
+          <span style={{color: 'var(--text-dim)', fontSize: '0.8rem'}}>Símbolos disponibles:</span>
+          {INDICES_CATEGORIES[activeCategory].map(item => (
+            <button 
+              key={item.symbol}
+              onClick={() => setSelectedSymbol(item.symbol)}
+              title={item.desc}
+              style={{
+                padding: '8px 15px',
+                background: selectedSymbol === item.symbol ? 'var(--accent-primary)' : 'var(--bg-card)',
+                border: selectedSymbol === item.symbol ? '1px solid var(--accent-primary)' : '1px solid var(--border)',
+                borderRadius: '6px',
+                color: selectedSymbol === item.symbol ? 'black' : 'white',
+                fontWeight: selectedSymbol === item.symbol ? 'bold' : 'normal',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: selectedSymbol === item.symbol ? '0 0 12px rgba(0, 255, 128, 0.4)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              <span>{item.symbol}</span>
+              <span style={{fontSize: '0.65rem', opacity: selectedSymbol === item.symbol ? 0.8 : 0.5}}>
+                ({item.desc.split(' ')[0]}...)
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -769,20 +854,29 @@ function App() {
 
            <div className="card" style={{padding: '15px', marginTop: '15px'}}>
               <h4 style={{fontSize: '0.8rem', marginBottom: '10px'}}>📡 RADAR (SCANNER 24/7)</h4>
-              <p style={{fontSize: '0.7rem', color: 'var(--text-dim)', marginBottom: '10px'}}>
-                Selecciona los índices que la IA monitoreará en segundo plano, sin importar cuál estés viendo en pantalla.
+              <p style={{fontSize: '0.7rem', color: 'var(--text-dim)', marginBottom: '12px'}}>
+                Selecciona los índices que la IA monitoreará en segundo plano.
               </p>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                {['Fortune100.', 'Fortune250.', 'BullX400.', 'BearX400.', 'VorteX75.', 'FomoX111.'].map(sym => (
-                  <label key={sym} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: monitoredSymbols.includes(sym) ? 'var(--accent-primary)' : 'var(--text-main)'}}>
-                    <input 
-                      type="checkbox" 
-                      checked={monitoredSymbols.includes(sym)}
-                      onChange={() => toggleMonitoredSymbol(sym)}
-                      style={{accentColor: 'var(--accent-primary)'}}
-                    />
-                    {sym}
-                  </label>
+              <div style={{maxHeight: '340px', overflowY: 'auto', paddingRight: '5px', display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                {Object.entries(INDICES_CATEGORIES).map(([cat, items]) => (
+                  <div key={cat} style={{borderBottom: '1px solid rgba(255, 255, 255, 0.05)', paddingBottom: '8px'}}>
+                    <div style={{fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-dim)', marginBottom: '8px'}}>
+                      {cat}
+                    </div>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '6px'}}>
+                      {items.map(item => (
+                        <label key={item.symbol} title={item.desc} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', cursor: 'pointer', color: monitoredSymbols.includes(item.symbol) ? 'var(--accent-primary)' : 'var(--text-main)'}}>
+                          <input 
+                            type="checkbox" 
+                            checked={monitoredSymbols.includes(item.symbol)}
+                            onChange={() => toggleMonitoredSymbol(item.symbol)}
+                            style={{accentColor: 'var(--accent-primary)'}}
+                          />
+                          {item.symbol}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
            </div>
