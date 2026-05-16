@@ -58,16 +58,24 @@ class TradingBrain:
             system_instruction=self.system_instruction
         )
 
-    async def analyze_ticks(self, symbol, ticks_data):
+    async def analyze_ticks(self, symbol, ticks_history):
         """
-        Sends current market context to Gemini for decision making (Async).
+        Sends historical market context to Gemini for decision making (Async).
         """
         prompt = f"""
-        ### DATOS DEL MERCADO ACTUAL ###
+        ### DATOS DEL MERCADO ACTUAL (VENTANA HISTÓRICA) ###
         - Índice: {symbol}
-        - Ticks: {ticks_data}
+        - Total de Ticks en memoria: {len(ticks_history)}
+        - Historial Cronológico de Ticks (del más antiguo al más reciente):
+        {ticks_history}
         
-        Analiza la convergencia de estos datos con el manual técnico y devuelve la decisión en JSON.
+        ### INSTRUCCIÓN DE ANÁLISIS ESTRUCTURAL ###
+        Con este historial de ticks, no estás viendo un solo punto, sino la TENDENCIA RECIENTE.
+        1. Identifica si hay consolidación, altos más altos o bajos más bajos.
+        2. Revisa el ángulo de Gann del último tick en relación a los anteriores para ver en qué fase de respiración está.
+        3. Evalúa si el comportamiento se alinea con una zona KLRR según el manual.
+        
+        Analiza la convergencia estructural y devuelve la decisión en el formato JSON exigido.
         """
         try:
             # Run in a thread if the library is not native async, 

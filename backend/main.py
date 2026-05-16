@@ -35,6 +35,9 @@ async def update_config(new_config: dict):
 
 # Global state for signals
 last_signals = {}
+# Global state for tick history per symbol
+tick_histories = {}
+MAX_HISTORY = 300 # Guardar los últimos 300 ticks para contexto
 
 @app.websocket("/ws/market")
 async def market_stream(websocket: WebSocket):
@@ -43,11 +46,14 @@ async def market_stream(websocket: WebSocket):
     await websocket.accept()
     print(f"--- CONEXIÓN WS ACEPTADA PARA {symbol} ---")
     
-    async def run_ai_analysis(tick_data):
+    if symbol not in tick_histories:
+        tick_histories[symbol] = []
+
+    async def run_ai_analysis(history):
         ai_res = None
         if CONFIG["use_gemini"]:
             try:
-                res = await brain.analyze_ticks(symbol, tick_data)
+                res = await brain.analyze_ticks(symbol, history)
                 if isinstance(res, str):
                     clean_res = re.sub(r'```json\n|\n```', '', res)
                     ai_res = json.loads(clean_res)
@@ -57,17 +63,19 @@ async def market_stream(websocket: WebSocket):
                 print(f"Error calling Gemini: {e}")
                 ai_res = None
         
-        # Fallback logic
+        # Fallback logic en caso de fallo de IA
         if not ai_res or ai_res.get("decision") == "WAIT":
-            is_buy = tick_data["angle"] < 180
+            is_buy = history[-1]["angle"] < 180 if history else True
+            last_price = history[-1]["price"] if history else 0
+            e_draw = history[-1]["e_draw"] if history else 0
             ai_res = {
-                "decision": "BUY" if is_buy else "SELL",
-                "type": "Continuidad (Manual)" if tick_data["e_draw"] < 0.45 else "Scalping (Respiro)",
-                "is_continuation": tick_data["e_draw"] < 0.45,
-                "reason": ai_res.get("reason") if ai_res else f"Algoritmo Matemático: Gann en {tick_data['angle']}°. (IA Apagada)",
-                "entry_price": tick_data["price"],
-                "stop_loss": round(tick_data["price"] - 12.4, 2) if is_buy else round(tick_data["price"] + 12.4, 2),
-                "take_profit": round(tick_data["price"] + 30.2, 2) if is_buy else round(tick_data["price"] - 30.2, 2),
+                "decision": "WAIT" if not ai_res else ai_res.get("decision"),
+                "type": ai_res.get("type") if ai_res else "Modo Matemático",
+                "is_continuation": e_draw < 0.45,
+                "reason": ai_res.get("reason") if ai_res else "Sin convergencia KLRR. IA en espera.",
+                "entry_price": last_price,
+                "stop_loss": round(last_price - 12.4, 2) if is_buy else round(last_price + 12.4, 2),
+                "take_profit": round(last_price + 30.2, 2) if is_buy else round(last_price - 30.2, 2),
                 "confidence_score": 0.85
             }
         
@@ -85,6 +93,11 @@ async def market_stream(websocket: WebSocket):
                 await asyncio.sleep(1)
                 continue
             
+            # Guardar en el historial
+            tick_histories[symbol].append(tick)
+            if len(tick_histories[symbol]) > MAX_HISTORY:
+                tick_histories[symbol].pop(0)
+            
             if tick["tick"] == 1 or tick["tick"] % 50 == 0:
                 if symbol not in last_signals:
                     last_signals[symbol] = {
@@ -94,7 +107,8 @@ async def market_stream(websocket: WebSocket):
                         "entry_price": tick["price"],
                         "stop_loss": 0, "take_profit": 0, "confidence_score": 0.5
                     }
-                asyncio.create_task(run_ai_analysis(tick))
+                # Pasamos una copia del historial actual para dar contexto (hasta 300 ticks)
+                asyncio.create_task(run_ai_analysis(list(tick_histories[symbol])))
 
             payload = {
                 "type": "TICK",
