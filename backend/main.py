@@ -275,12 +275,25 @@ async def run_ai_analysis_global(symbol, history):
             except Exception as e:
                 print(f"Error ajustando stop loss: {e}")
                 
-        # 🛑 PREVENCIÓN DE DUPLICADOS: Verificar si hay órdenes pendientes activas
+        # 🛑 PREVENCIÓN DE DUPLICADOS EXACTOS: Verificar si hay órdenes pendientes activas cerca de este nivel
         open_orders = market_provider.get_open_orders(symbol)
         if open_orders and ai_res.get("decision") in ["BUY", "SELL", "PENDING_BUY", "PENDING_SELL"]:
-            # Ya hay una orden programada esperando llegar al precio
-            ai_res["decision"] = "WAIT"
-            ai_res["reason"] = f"⏳ [ORDEN PROGRAMADA ACTIVA] Ya existe una orden pendiente esperando en {open_orders[0].get('target_price')}. Suspendiendo nuevas entradas hasta que se active o cancele."
+            proposed_price = float(ai_res.get("target_entry_price", history[-1]["price"]))
+            if proposed_price <= 0:
+                proposed_price = history[-1]["price"]
+                
+            # Revisar si ya hay una orden a menos de 5 puntos de distancia
+            is_duplicate = False
+            duplicate_price = 0
+            for order in open_orders:
+                if abs(order.get('target_price', 0) - proposed_price) < 5.0:
+                    is_duplicate = True
+                    duplicate_price = order.get('target_price')
+                    break
+                    
+            if is_duplicate:
+                ai_res["decision"] = "WAIT"
+                ai_res["reason"] = f"⏳ [BLOQUEO DUPLICIDAD] Ya existe una orden programada muy cerca de este nivel ({duplicate_price}). Evitando sobre-exposición en el mismo punto."
             
         # Auto-Trading Execution
         if CONFIG.get("auto_trade") and ai_res.get("decision") in ["BUY", "SELL", "PENDING_BUY", "PENDING_SELL"] and not locked:
