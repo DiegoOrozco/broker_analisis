@@ -77,6 +77,19 @@ async def market_stream(websocket: WebSocket):
                 "take_profit": 0,
                 "confidence_score": ai_res.get("confidence_score", 0.5) if ai_res else 0.5
             }
+        else:
+            # Garantizar matemáticamente que el Stop Loss jamás exceda 10 puntos (10 velitas)
+            try:
+                entry = float(ai_res.get("entry_price", history[-1]["price"] if history else 0))
+                sl = float(ai_res.get("stop_loss", 0))
+                if ai_res.get("decision") == "BUY":
+                    if sl < entry - 10.0 or sl >= entry:
+                        ai_res["stop_loss"] = round(entry - 10.0, 2)
+                elif ai_res.get("decision") == "SELL":
+                    if sl > entry + 10.0 or sl <= entry:
+                        ai_res["stop_loss"] = round(entry + 10.0, 2)
+            except Exception as e:
+                print(f"Error ajustando stop loss: {e}")
         
         last_signals[symbol] = ai_res
         print(f"--- NUEVA SEÑAL PARA {symbol}: {ai_res['decision']} ---")
