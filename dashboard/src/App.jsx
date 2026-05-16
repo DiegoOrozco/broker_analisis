@@ -11,6 +11,7 @@ function App() {
   const [lockedTrade, setLockedTrade] = useState(null)
   const [useGemini, setUseGemini] = useState(true)
   const [autoTrade, setAutoTrade] = useState(false)
+  const [monitoredSymbols, setMonitoredSymbols] = useState([])
   
   const ws = useRef(null)
   const API_BASE = "http://100.75.221.54:8000"
@@ -23,6 +24,7 @@ function App() {
       .then(data => {
         setUseGemini(data.use_gemini)
         setAutoTrade(data.auto_trade)
+        setMonitoredSymbols(data.monitored_symbols || [])
       })
       .catch(err => console.error("Error fetching config:", err))
       
@@ -53,6 +55,20 @@ function App() {
       body: JSON.stringify({ auto_trade: newValue })
     }).then(() => {
       addLog(`🤖 AUTO-TRADING ${newValue ? 'ACTIVADO (Ejecución Directa MT5)' : 'DESACTIVADO (Modo Manual)'}`)
+    })
+  }
+
+  const toggleMonitoredSymbol = (symbol) => {
+    const newMonitored = monitoredSymbols.includes(symbol)
+      ? monitoredSymbols.filter(s => s !== symbol)
+      : [...monitoredSymbols, symbol]
+    setMonitoredSymbols(newMonitored)
+    fetch(`${API_BASE}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ monitored_symbols: newMonitored })
+    }).then(() => {
+      addLog(`📡 RADAR ACTUALIZADO: Monitoreando [${newMonitored.join(', ')}]`)
     })
   }
 
@@ -444,6 +460,26 @@ function App() {
                     transition: 'all 0.3s'
                   }} />
                 </button>
+              </div>
+           </div>
+
+           <div className="card" style={{padding: '15px', marginTop: '15px'}}>
+              <h4 style={{fontSize: '0.8rem', marginBottom: '10px'}}>📡 RADAR (SCANNER 24/7)</h4>
+              <p style={{fontSize: '0.7rem', color: 'var(--text-dim)', marginBottom: '10px'}}>
+                Selecciona los índices que la IA monitoreará en segundo plano, sin importar cuál estés viendo en pantalla.
+              </p>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                {['Fortune100', 'Fortune250', 'BullX400', 'BearX400', 'VorteX75', 'FomoX111'].map(sym => (
+                  <label key={sym} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', cursor: 'pointer', color: monitoredSymbols.includes(sym) ? 'var(--accent-primary)' : 'var(--text-main)'}}>
+                    <input 
+                      type="checkbox" 
+                      checked={monitoredSymbols.includes(sym)}
+                      onChange={() => toggleMonitoredSymbol(sym)}
+                      style={{accentColor: 'var(--accent-primary)'}}
+                    />
+                    {sym}
+                  </label>
+                ))}
               </div>
            </div>
         </div>
