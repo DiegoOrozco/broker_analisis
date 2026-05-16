@@ -109,6 +109,59 @@ last_signals = {}
 tick_histories = {}
 MAX_HISTORY = 300 # Guardar los últimos 300 ticks para contexto
 
+def detect_spike_setup(symbol, history):
+    """
+    Algoritmo Matemático de Alta Precisión (Spike Hunter)
+    Analiza la compresión del precio para detectar Spikes inminentes en BullX y BearX.
+    """
+    if len(history) < 25 or ("Bull" not in symbol and "Bear" not in symbol):
+        return None
+        
+    recent = history[-25:]
+    first_price = recent[0]["price"]
+    last_price = recent[-1]["price"]
+    
+    # Buscar si ya hubo un spike reciente (salto grande entre 2 ticks)
+    for i in range(1, len(recent)):
+        diff = recent[i]["price"] - recent[i-1]["price"]
+        if "Bull" in symbol and diff > 3.0: # Spike alcista ya ocurrió
+            return None
+        if "Bear" in symbol and diff < -3.0: # Spike bajista ya ocurrió
+            return None
+            
+    if "Bull" in symbol:
+        drop = first_price - last_price
+        # Si ha caído sostenidamente más de 3.5 puntos sin spikes, está a punto de reventar al alza
+        if drop >= 3.5:
+            return {
+                "decision": "BUY",
+                "type": "🚀 SPIKE HUNTER ENTRY",
+                "is_continuation": False,
+                "reason": f"🔥 [Cazador de Spikes] Compresión extrema de {round(drop, 2)} puntos a la baja sin retroceso. Spike ALCISTA inminente garantizado por comportamiento del índice.",
+                "forecast": "Ruptura violenta al alza (Spike masivo).",
+                "entry_price": last_price,
+                "stop_loss": round(last_price - 10.0, 2),
+                "take_profit": round(last_price + 30.0, 2),
+                "confidence_score": 0.98
+            }
+            
+    elif "Bear" in symbol:
+        rise = last_price - first_price
+        if rise >= 3.5:
+            return {
+                "decision": "SELL",
+                "type": "☄️ SPIKE HUNTER ENTRY",
+                "is_continuation": False,
+                "reason": f"🔥 [Cazador de Spikes] Compresión extrema de {round(rise, 2)} puntos al alza sin retroceso. Spike BAJISTA inminente garantizado por comportamiento del índice.",
+                "forecast": "Colapso violento a la baja (Spike masivo).",
+                "entry_price": last_price,
+                "stop_loss": round(last_price + 10.0, 2),
+                "take_profit": round(last_price - 30.0, 2),
+                "confidence_score": 0.98
+            }
+            
+    return None
+
 async def run_ai_analysis_global(symbol, history):
     ai_res = None
     locked = locked_trades.get(symbol)
@@ -126,18 +179,26 @@ async def run_ai_analysis_global(symbol, history):
             
     # Fallback o formateo si la decisión es WAIT o falló
     if not ai_res or ai_res.get("decision") == "WAIT":
-        last_price = history[-1]["price"] if history else 0
-        ai_res = {
-            "decision": "WAIT",
-            "type": ai_res.get("type") if ai_res else "Espera / Rango",
-            "is_continuation": False,
-            "reason": ai_res.get("reason") if ai_res else "Sin convergencia clara de KLRR / Gann. Esperando setup de alta convicción.",
-            "forecast": ai_res.get("forecast") if ai_res else "A la espera de ruptura estructural o patrón claro.",
-            "entry_price": last_price,
-            "stop_loss": 0,
-            "take_profit": 0,
-            "confidence_score": ai_res.get("confidence_score", 0.5) if ai_res else 0.5
-        }
+        # 🛡️ INYECCIÓN DEL SPIKE HUNTER 🛡️
+        # Si Gemini dice WAIT, consultamos a las matemáticas exactas del comportamiento del índice
+        spike_override = detect_spike_setup(symbol, history)
+        
+        if spike_override:
+            print(f"--- [SPIKE HUNTER] OVERRIDE DE IA ACTIVADO PARA {symbol}! ---")
+            ai_res = spike_override
+        else:
+            last_price = history[-1]["price"] if history else 0
+            ai_res = {
+                "decision": "WAIT",
+                "type": ai_res.get("type") if ai_res else "Espera / Rango",
+                "is_continuation": False,
+                "reason": ai_res.get("reason") if ai_res else "Sin convergencia clara de KLRR / Gann. Esperando setup de alta convicción.",
+                "forecast": ai_res.get("forecast") if ai_res else "A la espera de ruptura estructural o patrón claro.",
+                "entry_price": last_price,
+                "stop_loss": 0,
+                "take_profit": 0,
+                "confidence_score": ai_res.get("confidence_score", 0.5) if ai_res else 0.5
+            }
     else:
         active_positions = market_provider.get_open_positions(symbol)
         if active_positions and ai_res.get("decision") in ["EXIT", "SALIR", "CLOSE"]:
