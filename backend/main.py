@@ -86,6 +86,23 @@ async def execute_manual_trade(payload: dict):
         print(f"--- [ERROR] DISPARANDO ORDEN: {trade_result.get('error')} ---")
         return {"success": False, "error": trade_result.get("error")}
 
+@app.post("/close_manual_trade")
+async def close_manual_trade(payload: dict):
+    symbol = payload.get("symbol")
+    ticket = payload.get("ticket")
+    
+    print(f"--- [CIERRE MANUAL] SOLICITADO DESDE EL DASHBOARD: Ticket #{ticket} en {symbol} ---")
+    close_result = market_provider.close_trade(ticket=ticket)
+    
+    if close_result.get("success"):
+        if symbol in locked_trades:
+            del locked_trades[symbol]
+        print(f"--- [EXITO] CIERRE EXITOSO (Ticket #{ticket}). POSICION LIBERADA. ---")
+        return {"success": True, "closed_price": close_result.get("closed_price")}
+    else:
+        print(f"--- [ERROR] CERRANDO ORDEN #{ticket}: {close_result.get('error')} ---")
+        return {"success": False, "error": close_result.get("error")}
+
 # Global state for signals
 last_signals = {}
 # Global state for tick history per symbol

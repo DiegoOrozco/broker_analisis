@@ -127,6 +127,28 @@ function App() {
     }).catch(err => console.error("Error unlocking trade:", err))
   }
 
+  const closeDirectManualTrade = (ticket) => {
+    addLog(`⏳ CERRANDO POSICIÓN MANUAL: Solicitando cierre para ticket #${ticket} en ${selectedSymbol}...`)
+    fetch(`${API_BASE}/close_manual_trade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: selectedSymbol, ticket: ticket })
+    }).then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setLockedTrade(null)
+          playAudioAlert('CLOSE')
+          addLog(`🔴 [CIERRE EXITOSO] MT5: Posición #${ticket} cerrada a ${data.closed_price || 'mercado'}.`)
+        } else {
+          addLog(`⚠️ ERROR CIERRE MT5: ${data.error}`)
+          alert(`No se pudo cerrar la orden en MT5: ${data.error}`)
+        }
+      }).catch(err => {
+        console.error("Error closing trade:", err)
+        addLog(`⚠️ ERROR DE RED AL CERRAR: ${err.message}`)
+      })
+  }
+
   const executeDirectManualTrade = (decision) => {
     const curPrice = currentTick ? currentTick.price : (lastSignal ? lastSignal.entry_price : 0)
     if (!curPrice) {
@@ -432,13 +454,28 @@ function App() {
                  <div style={{color: 'var(--text-dim)', fontSize: '0.95rem', marginTop: '6px'}}>
                    Entrada Confirmada: <strong style={{color: 'white'}}>{lockedTrade.entry_price}</strong> | SL: <strong style={{color: 'var(--danger)'}}>{lockedTrade.stop_loss}</strong> | TP: <strong style={{color: 'var(--success)'}}>{lockedTrade.take_profit}</strong>
                  </div>
+                 {lockedTrade.ticket && (
+                   <div style={{color: 'var(--warning)', fontSize: '0.85rem', marginTop: '4px', fontFamily: 'JetBrains Mono'}}>
+                     Ticket MT5: #{lockedTrade.ticket}
+                   </div>
+                 )}
                </div>
-               <button 
-                 onClick={unlockTrade}
-                 style={{background: 'var(--danger)', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem'}}
-               >
-                 🔓 Cerrar / Liberar
-               </button>
+               <div style={{display: 'flex', gap: '10px'}}>
+                 {lockedTrade.ticket && (
+                   <button 
+                     onClick={() => closeDirectManualTrade(lockedTrade.ticket)}
+                     style={{background: 'var(--danger)', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', boxShadow: '0 0 15px rgba(239, 83, 80, 0.5)'}}
+                   >
+                     🔴 CERRAR ORDEN EN MT5
+                   </button>
+                 )}
+                 <button 
+                   onClick={unlockTrade}
+                   style={{background: 'rgba(255, 255, 255, 0.15)', color: 'var(--text-dim)', border: '1px solid rgba(255, 255, 255, 0.2)', padding: '10px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center'}}
+                 >
+                   🔓 Solo Liberar Monitoreo
+                 </button>
+               </div>
              </div>
            ) : (
              <div style={{marginTop: '25px', padding: '18px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'}}>
