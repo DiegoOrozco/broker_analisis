@@ -80,7 +80,13 @@ class TradingBrain:
         2. Identifica si el precio está en un rango de acumulación/distribución de Wyckoff o si hay un rompimiento genuino.
         3. Revisa el ángulo de Gann del último tick en relación a los anteriores para ver en qué fase de respiración está.
         4. Si no hay una convergencia clara con una zona KLRR o el mercado está ruidoso, tu decisión OBLIGATORIA es "WAIT" para proteger el capital.
-        
+
+        ### REGLAS DE PROYECCIÓN INSTITUCIONAL (SL y TP AMPLIOS) ###
+        ¡PROHIBIDO DAR TAKE PROFITS O STOP LOSS RIDÍCULAMENTE PEQUEÑOS DE 5 O 10 PUNTOS! En los índices sintéticos de Bridge Markets (Fortune, BullX, FomoX), las rupturas de zonas KLRR y descargas de Wyckoff tienen recorridos profundos de alta volatilidad.
+        - Para operaciones de BUY o SELL, el Take Profit debe buscar el final de la estructura institucional de descarga (ej. +150 a +450 puntos de distancia desde el precio de entrada, apuntando al objetivo de Fibonacci 1.0 o 1.618 del manual).
+        - El Stop Loss debe estar resguardado detrás de la KLRR opuesta o base estructural (ej. -30 a -90 puntos, garantizando un ratio Riesgo:Beneficio institucional de al menos 1:3 a 1:5).
+        - En el campo "forecast" (Proyección Proactiva), describe con cifras y fundamentos técnicos del manual hacia dónde se dirigirá este recorrido completo de cientos de puntos.
+
         Analiza la convergencia estructural y devuelve la decisión en el formato JSON exigido.
         """
         try:
